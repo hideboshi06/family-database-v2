@@ -130,29 +130,45 @@
     return '<div class="itemrow"><label class="checkboxlabel"><input type="checkbox" data-action="shopping-needed" data-id="'+esc(x.id)+'" '+(x.needed?"checked":"")+'><span class="itemmain"><span class="item-title">'+esc(x.product)+(x.quantity?' <span class="tiny">×'+esc(x.quantity)+'</span>':"")+'</span><span class="item-sub" style="display:block">'+esc(brief?(x.note||""):[x.note,x.store].filter(Boolean).join(" · "))+'</span></span></label>'+
       (brief?"":'<button type="button" class="btn secondary smallbtn" data-action="edit-shopping" data-id="'+esc(x.id)+'">編集</button>')+'</div>';
   }
+  function filledAgendaFields(row){
+    return fields.filter(k=>row[k]&&String(row[k]).trim());
+  }
+  function agendaDetails(day,row,compact=false){
+    const filled=filledAgendaFields(row);
+    const lines=filled.map(k=>line(person[k],row[k])).join("");
+    const preview=filled.map(k=>person[k]+" "+String(row[k]).replace(/\s+/g," ").trim()).join(" ／ ");
+    const isLong=preview.length>75||filled.some(k=>String(row[k]).split("\n").length>3);
+    const cls="dayrow"+(compact?" dayrow-inline":"")+(isLong?" has-more":"")+(!filled.length?" no-schedule":"");
+    return '<div class="'+cls+'">'+
+      (compact?"":'<button type="button" data-action="edit-day" data-day="'+day+'" class="daydate '+weekend(day)+'">'+fmtDay(day)+'</button>')+
+      '<div class="daycontent">'+
+      (isLong?'<div class="schedule-preview">'+esc(preview)+'</div>':"")+
+      '<div class="schedule-full">'+(lines||'<div class="empty">予定なし</div>')+'</div>'+
+      (isLong?'<div class="schedule-actions"><button type="button" class="schedule-toggle" data-action="toggle-schedule" aria-expanded="false">続きを読む ▼</button></div>':"")+
+      '</div></div>';
+  }
   function renderDashboard(){
     const today=isoToday(),byDate=new Map(state.daily.map(x=>[x.day,x])),now=byDate.get(today)||{};
-    $("today-date").textContent=fmtDay(today);
+    $("today-date").textContent="今日 · "+fmtDay(today);
+    $("today-date").dataset.day=today;
     $("weather-summary").innerHTML='<div class="weather-summary"><strong>朝</strong> '+weatherPart(now.morning_weather,now.morning_temp_c,now.morning_rain_pct)+' <span class="muted">／</span> <strong>夕</strong> '+weatherPart(now.evening_weather,now.evening_temp_c,now.evening_rain_pct)+'</div>';
+    $("today-lunch").innerHTML=now.lunch?'<div class="scheduleline">'+esc(now.lunch)+'</div>':'<p class="empty">給食は未登録</p>';
+    $("today-garbage").innerHTML=now.garbage?'<div class="scheduleline">'+esc(now.garbage)+'</div>':'<p class="empty">ゴミは未登録</p>';
+    $("today-schedule").innerHTML=agendaDetails(today,now,true);
+
     const tomorrow=dateAdd(today,1),next=byDate.get(tomorrow)||{};
     $("tomorrow-title").textContent="明日の準備 · "+fmtDay(tomorrow);
+    $("tomorrow-title").dataset.day=tomorrow;
     $("tomorrow-weather").innerHTML='<span class="tomorrow-forecast"><strong>朝</strong> '+weatherPart(next.morning_weather,next.morning_temp_c,next.morning_rain_pct)+'</span>'+
       ' <span class="muted">／</span> <span class="tomorrow-forecast"><strong>夕</strong> '+weatherPart(next.evening_weather,next.evening_temp_c,next.evening_rain_pct)+'</span>';
     $("tomorrow-lunch").textContent=next.lunch||"給食は未登録";
-    $("today-lunch").innerHTML=now.lunch?'<div class="scheduleline">'+esc(now.lunch)+'</div>':'<p class="empty">給食は未登録</p>';
-    $("today-garbage").innerHTML=now.garbage?'<div class="scheduleline">'+esc(now.garbage)+'</div>':'<p class="empty">ゴミは未登録</p>';
-    $("schedule-list").innerHTML=Array.from({length:9},(_,i)=>{
-      const d=dateAdd(today,i),row=byDate.get(d)||{};
-      const filled=fields.filter(k=>row[k]&&String(row[k]).trim());
-      const lines=filled.map(k=>line(person[k],row[k])).join("");
-      const preview=filled.map(k=>person[k]+" "+String(row[k]).replace(/\s+/g," ").trim()).join(" ／ ");
-      const isLong=preview.length>75||filled.some(k=>String(row[k]).split("\n").length>3);
-      const classes="dayrow"+(i===0?" today":"")+(isLong?" has-more":"")+(!filled.length?" no-schedule":"");
-      return '<div class="'+classes+'"><button type="button" data-action="edit-day" data-day="'+d+'" class="daydate '+weekend(d)+'">'+(i===0?"今日":fmtDay(d))+'</button><div class="daycontent">'+
-        (isLong?'<div class="schedule-preview">'+esc(preview)+'</div>':"")+
-        '<div class="schedule-full">'+(lines||'<div class="empty">予定なし</div>')+'</div>'+
-        (isLong?'<div class="schedule-actions"><button type="button" class="schedule-toggle" data-action="toggle-schedule" aria-expanded="false">続きを読む ▼</button></div>':"")+
-        '</div></div>';
+    const tomorrowHasPlans=filledAgendaFields(next).length>0;
+    $("tomorrow-agenda-block").hidden=!tomorrowHasPlans;
+    $("tomorrow-schedule").innerHTML=tomorrowHasPlans?agendaDetails(tomorrow,next,true):"";
+
+    $("schedule-list").innerHTML=Array.from({length:7},(_,i)=>{
+      const day=dateAdd(today,i+2);
+      return agendaDetails(day,byDate.get(day)||{});
     }).join("");
     const due=state.cleaning.filter(c=>!c.next_due||c.next_due<=today);
     $("cleaning-due").innerHTML=due.length?due.map(c=>'<div class="itemrow"><div class="itemmain"><div class="item-title">'+esc(c.name)+'</div><div class="item-sub">次回 '+esc(c.next_due||"未設定")+'</div></div><button type="button" data-action="done-clean" data-id="'+esc(c.id)+'" class="btn secondary smallbtn">完了</button></div>').join(""):'<p class="empty">期限が来ている掃除はありません</p>';
