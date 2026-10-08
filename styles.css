@@ -214,3 +214,37 @@ details.help summary{color:var(--navy);cursor:pointer;font-size:12px}
 .agenda-weather{font-size:13px;line-height:1.55;letter-spacing:0}
 .agenda-weather .weather-summary{font-size:inherit}
 .agenda-date-section .agenda-day-details{margin-top:12px}
+
+/* Three purposeful cards: a compact today summary, tomorrow's prep, and full future plans. */
+.daily-card{padding:0;overflow:hidden;border-radius:16px}
+.today-card{border-color:#d6e4f0}
+.tomorrow-card{border-color:#d9e7da;background:var(--paper)}
+.daily-header{padding:12px 14px 11px;border-bottom:1px solid var(--line)}
+.today-card .daily-header{background:linear-gradient(110deg,#e8f3fc,#f5f9fd)}
+.tomorrow-card .daily-header{background:linear-gradient(110deg,#f0f8ee,#fafcf9)}
+.daily-date{display:block;border:0;padding:0;min-height:29px;background:transparent;color:var(--ink);font-size:17px;font-weight:800;line-height:1.3;text-align:left}
+.daily-weather{margin-top:5px;color:var(--ink);font-size:13px;line-height:1.6;min-width:0}
+.daily-weather .weather-summary{font-size:inherit;line-height:inherit}
+.daily-weather.tomorrow-weather{display:flex;align-items:center;flex-wrap:wrap;gap:0 5px}
+.daily-body{display:grid;gap:8px;padding:13px 14px 15px}
+.daily-info{display:grid;grid-template-columns:44px minmax(0,1fr);gap:8px;align-items:start;min-width:0}
+.daily-key{color:var(--sub);font-size:12px;font-weight:750;padding-top:2px}
+.daily-value{font-size:13px;line-height:1.55;white-space:pre-line;overflow-wrap:anywhere;min-width:0}
+.daily-value .dayrow-inline{padding:0}
+.daily-value .daycontent{min-width:0}
+.daily-value .scheduleline{margin-bottom:3px}
+.daily-summary{color:#526a7c}
+.future-card{padding:5px 14px;border-radius:16px}
+.future-card .dayrow{display:block;border-top:1px solid var(--line);padding:13px 0}
+.future-card .dayrow:first-child{border-top:0}
+.future-card .daydate{font-size:15px;min-height:30px;padding:0 0 5px;color:var(--ink)}
+.future-card .daydate.sat{color:var(--blue)}
+.future-card .daydate.sun{color:var(--red)}
+.future-card .daycontent{min-width:0;padding:2px 0}
+.future-card .scheduleline{white-space:normal;margin-bottom:5px}
+.future-card .schedule-text{white-space:pre-line;overflow-wrap:anywhere}
+@media(min-width:690px){
+  .daily-header{padding:15px 20px 12px}
+  .daily-body{padding:15px 20px 18px;gap:10px}
+  .future-card{padding:5px 20px}
+}
