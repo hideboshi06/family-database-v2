@@ -69,7 +69,6 @@
       check(m);
       if(!m.data){$("denied-email").textContent=email;show("denied");return;}
       state.user=u.data.user;state.role=m.data.role;
-      $("user-label").textContent=state.role==="admin"?"管理者":"家族";
       $("settings-admin").hidden=state.role!=="admin";
       show("main");navigate("dashboard");
       if(location.search.includes("code="))history.replaceState(null,"",location.pathname);
@@ -135,6 +134,11 @@
     const today=isoToday(),byDate=new Map(state.daily.map(x=>[x.day,x])),now=byDate.get(today)||{};
     $("today-date").textContent=fmtDay(today);
     $("weather-summary").innerHTML='<div class="weather-summary"><strong>朝</strong> '+weatherPart(now.morning_weather,now.morning_temp_c,now.morning_rain_pct)+' <span class="muted">／</span> <strong>夕</strong> '+weatherPart(now.evening_weather,now.evening_temp_c,now.evening_rain_pct)+'</div>';
+    const tomorrow=dateAdd(today,1),next=byDate.get(tomorrow)||{};
+    $("tomorrow-title").textContent="明日の準備 · "+fmtDay(tomorrow);
+    $("tomorrow-weather").innerHTML='<span class="tomorrow-forecast"><strong>朝</strong> '+weatherPart(next.morning_weather,next.morning_temp_c,next.morning_rain_pct)+'</span>'+
+      ' <span class="muted">／</span> <span class="tomorrow-forecast"><strong>夕</strong> '+weatherPart(next.evening_weather,next.evening_temp_c,next.evening_rain_pct)+'</span>';
+    $("tomorrow-lunch").textContent=next.lunch||"給食は未登録";
     $("today-lunch").innerHTML=now.lunch?'<div class="scheduleline">'+esc(now.lunch)+'</div>':'<p class="empty">給食は未登録</p>';
     $("today-garbage").innerHTML=now.garbage?'<div class="scheduleline">'+esc(now.garbage)+'</div>':'<p class="empty">ゴミは未登録</p>';
     $("schedule-list").innerHTML=Array.from({length:9},(_,i)=>{
@@ -305,7 +309,6 @@
       if(a==="login")await signIn();
       if(a==="logout"||a==="switch")await signOut();
       if(a==="refresh"){await refresh();toast("更新したよ！");}
-      if(a==="goto-lunch"){state.mode="lunch";navigate("month");}
       if(a==="edit-day")await editDay(el.dataset.day);
       if(a==="toggle-schedule"){
         const row=el.closest(".dayrow");
