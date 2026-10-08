@@ -152,7 +152,7 @@
     const today=isoToday(),byDate=new Map(state.daily.map(x=>[x.day,x])),now=byDate.get(today)||{};
     $("today-date").textContent=fmtDay(today);
     $("today-date").dataset.day=today;
-    $("weather-summary").innerHTML='<div class="weather-summary"><strong>朝</strong>'+weatherPart(now.morning_weather,now.morning_temp_c,now.morning_rain_pct,true)+' <span class="muted">／</span> <strong>夕</strong>'+weatherPart(now.evening_weather,now.evening_temp_c,now.evening_rain_pct,true)+'</div>';
+    $("weather-summary").innerHTML='<div class="weather-summary"><strong>朝</strong> '+weatherPart(now.morning_weather,now.morning_temp_c,now.morning_rain_pct)+' <span class="muted">／</span> <strong>夕</strong> '+weatherPart(now.evening_weather,now.evening_temp_c,now.evening_rain_pct)+'</div>';
     $("today-lunch").innerHTML=now.lunch?'<div class="scheduleline">'+esc(now.lunch)+'</div>':'<p class="empty">給食は未登録</p>';
     $("today-garbage").innerHTML=now.garbage?'<div class="scheduleline">'+esc(now.garbage)+'</div>':'<p class="empty">ゴミは未登録</p>';
     const todayHasPlans=filledAgendaFields(now).length>0;
@@ -162,8 +162,8 @@
     const tomorrow=dateAdd(today,1),next=byDate.get(tomorrow)||{};
     $("tomorrow-title").textContent=fmtDay(tomorrow);
     $("tomorrow-title").dataset.day=tomorrow;
-    $("tomorrow-weather").innerHTML='<span class="tomorrow-forecast"><strong>朝</strong>'+weatherPart(next.morning_weather,next.morning_temp_c,next.morning_rain_pct,true)+'</span>'+
-      ' <span class="muted">／</span> <span class="tomorrow-forecast"><strong>夕</strong>'+weatherPart(next.evening_weather,next.evening_temp_c,next.evening_rain_pct,true)+'</span>';
+    $("tomorrow-weather").innerHTML='<span class="tomorrow-forecast"><strong>朝</strong> '+weatherPart(next.morning_weather,next.morning_temp_c,next.morning_rain_pct)+'</span>'+
+      ' <span class="muted">／</span> <span class="tomorrow-forecast"><strong>夕</strong> '+weatherPart(next.evening_weather,next.evening_temp_c,next.evening_rain_pct)+'</span>';
     $("tomorrow-lunch").textContent=next.lunch||"給食は未登録";
     const tomorrowHasPlans=filledAgendaFields(next).length>0;
     $("tomorrow-agenda-block").hidden=!tomorrowHasPlans;
