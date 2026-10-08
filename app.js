@@ -135,48 +135,46 @@
     return fields.filter(k=>row[k]&&String(row[k]).trim());
   }
   function agendaDetails(day,row,compact=false){
-    const filled=filledAgendaFields(row);
-    const lines=filled.map(k=>line(person[k],row[k])).join("");
-    const preview=filled.map(k=>person[k]+" "+String(row[k]).replace(/\s+/g," ").trim()).join(" ／ ");
-    const isLong=preview.length>75||filled.some(k=>String(row[k]).split("\n").length>3);
-    const cls="dayrow"+(compact?" dayrow-inline":"")+(isLong?" has-more":"")+(!filled.length?" no-schedule":"");
-    return '<div class="'+cls+'">'+
+    const lines=filledAgendaFields(row).map(k=>line(person[k],row[k])).join("");
+    return '<div class="dayrow'+(compact?' dayrow-inline':'')+'">'+
       (compact?"":'<button type="button" data-action="edit-day" data-day="'+day+'" class="daydate '+weekend(day)+'">'+fmtDay(day)+'</button>')+
-      '<div class="daycontent">'+
-      (isLong?'<div class="schedule-preview">'+esc(preview)+'</div>':"")+
-      '<div class="schedule-full">'+(lines||'<div class="empty">予定なし</div>')+'</div>'+
-      (isLong?'<div class="schedule-actions"><button type="button" class="schedule-toggle" data-action="toggle-schedule" aria-expanded="false">続きを読む ▼</button></div>':"")+
-      '</div></div>';
+      '<div class="daycontent">'+(lines||'<div class="empty">予定なし</div>')+'</div></div>';
+  }
+  function shortSummary(items,label){
+    if(!items.length)return "なし";
+    const names=items.slice(0,2).map(label).filter(Boolean).join("、");
+    return items.length+"件"+(names?" · "+names:"")+(items.length>2?" ほか"+(items.length-2)+"件":"");
   }
   function renderDashboard(){
     const today=isoToday(),byDate=new Map(state.daily.map(x=>[x.day,x])),now=byDate.get(today)||{};
     $("today-date").textContent=fmtDay(today);
     $("today-date").dataset.day=today;
     $("weather-summary").innerHTML='<div class="weather-summary"><strong>朝</strong> '+weatherPart(now.morning_weather,now.morning_temp_c,now.morning_rain_pct)+' <span class="muted">／</span> <strong>夕</strong> '+weatherPart(now.evening_weather,now.evening_temp_c,now.evening_rain_pct)+'</div>';
-    $("today-lunch").innerHTML=now.lunch?'<div class="scheduleline">'+esc(now.lunch)+'</div>':'<p class="empty">給食は未登録</p>';
-    $("today-garbage").innerHTML=now.garbage?'<div class="scheduleline">'+esc(now.garbage)+'</div>':'<p class="empty">ゴミは未登録</p>';
+    $("today-lunch").textContent=now.lunch||"未登録";
+    $("today-garbage").textContent=now.garbage||"未登録";
     const todayHasPlans=filledAgendaFields(now).length>0;
     $("today-agenda-block").hidden=!todayHasPlans;
     $("today-schedule").innerHTML=todayHasPlans?agendaDetails(today,now,true):"";
+    const due=state.cleaning.filter(c=>!c.next_due||c.next_due<=today);
+    const needed=state.shopping.filter(x=>x.needed);
+    $("today-cleaning").textContent=shortSummary(due,c=>String(c.name||"").trim());
+    $("today-shopping").textContent=shortSummary(needed,x=>String(x.product||"").trim());
 
     const tomorrow=dateAdd(today,1),next=byDate.get(tomorrow)||{};
     $("tomorrow-title").textContent=fmtDay(tomorrow);
     $("tomorrow-title").dataset.day=tomorrow;
     $("tomorrow-weather").innerHTML='<span class="tomorrow-forecast"><strong>朝</strong> '+weatherPart(next.morning_weather,next.morning_temp_c,next.morning_rain_pct)+'</span>'+
       ' <span class="muted">／</span> <span class="tomorrow-forecast"><strong>夕</strong> '+weatherPart(next.evening_weather,next.evening_temp_c,next.evening_rain_pct)+'</span>';
-    $("tomorrow-lunch").textContent=next.lunch||"給食は未登録";
+    $("tomorrow-lunch").textContent=next.lunch||"未登録";
+    $("tomorrow-garbage").textContent=next.garbage||"未登録";
     const tomorrowHasPlans=filledAgendaFields(next).length>0;
     $("tomorrow-agenda-block").hidden=!tomorrowHasPlans;
     $("tomorrow-schedule").innerHTML=tomorrowHasPlans?agendaDetails(tomorrow,next,true):"";
 
     const upcoming=Array.from({length:7},(_,i)=>dateAdd(today,i+2))
       .filter(day=>filledAgendaFields(byDate.get(day)||{}).length>0);
+    $("future-card").hidden=!upcoming.length;
     $("schedule-list").innerHTML=upcoming.map(day=>agendaDetails(day,byDate.get(day)||{})).join("");
-    const due=state.cleaning.filter(c=>!c.next_due||c.next_due<=today);
-    $("cleaning-due").innerHTML=due.length?due.map(c=>'<div class="itemrow"><div class="itemmain"><div class="item-title">'+esc(c.name)+'</div><div class="item-sub">次回 '+esc(c.next_due||"未設定")+'</div></div><button type="button" data-action="done-clean" data-id="'+esc(c.id)+'" class="btn secondary smallbtn">完了</button></div>').join(""):'<p class="empty">期限が来ている掃除はありません</p>';
-    const needed=state.shopping.filter(x=>x.needed);
-    $("shopping-needed").innerHTML=needed.length?needed.map(x=>shoppingRow(x,true)).join(""):'<p class="empty">買い物が必要な商品はありません</p>';
-    $("shopping-count").textContent=needed.length?"（"+needed.length+"）":"";
   }
   function renderShopping(){
     const filter=$("shopping-filter").value;
@@ -328,14 +326,6 @@
       if(a==="logout"||a==="switch")await signOut();
       if(a==="refresh"){await refresh();toast("更新したよ！");}
       if(a==="edit-day")await editDay(el.dataset.day);
-      if(a==="toggle-schedule"){
-        const row=el.closest(".dayrow");
-        if(row){
-          const expanded=row.classList.toggle("expanded");
-          el.setAttribute("aria-expanded",String(expanded));
-          el.textContent=expanded?"折りたたむ ▲":"続きを読む ▼";
-        }
-      }
       if(a==="close")closeModal();
       if(a==="expand-day"){const d=el.dataset.day;state.opened.has(d)?state.opened.delete(d):state.opened.add(d);renderMonth();}
       if(a==="mode"){state.mode=el.dataset.mode;renderMonth();}
