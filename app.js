@@ -274,6 +274,7 @@
       if(a==="login")await signIn();
       if(a==="logout"||a==="switch")await signOut();
       if(a==="refresh"){await refresh();toast("更新したよ！");}
+      if(a==="goto-lunch"){state.mode="lunch";navigate("month");}
       if(a==="edit-day")await editDay(el.dataset.day);
       if(a==="close")closeModal();
       if(a==="expand-day"){const d=el.dataset.day;state.opened.has(d)?state.opened.delete(d):state.opened.add(d);renderMonth();}
