@@ -1,9 +1,9 @@
 # 天気自動更新の移行ガイド
 
-Family Database v2の天気更新は、**毎朝5:35 日本時間** に Supabase Cron → Edge Function → WeatherAPI.com → `public.daily` の順番で動きます。
+Family Database v2の天気更新は、**毎朝5:00 日本時間** に Supabase Cron → Edge Function → WeatherAPI.com → `public.daily` の順番で動きます。
 
 - Edge Function: `family-weather-update` （デプロイ済み、verify_jwt = false・共有トークン認証）
-- Cron: `family-weather-daily-0535-jst` （20:35 UTC、登録済み）
+- Cron: `family-weather-daily-0500-jst` （20:00 UTC、登録済み。旧5:35のジョブは解除済み）
 - 予報: 今日から最大3日分、朝8:00と夕方18:00、気温・降水確率・天候（日本語）
 - **旧GASの自動更新は切り替えが確認できるまで停止しないでください**。
 
@@ -28,7 +28,7 @@ SQL Editor:
 ```sql
 select jobname,schedule,active
 from cron.job
-where jobname='family-weather-daily-0535-jst';
+where jobname='family-weather-daily-0500-jst';
 
 -- Secretsの有無だけ確認。値そのものは表示しない。
 select name from vault.decrypted_secrets where name='family_weather_cron_token';
@@ -40,11 +40,12 @@ Cron実行ログは Supabase Dashboard → Integrations → Cron または `cron
 
 - Edge Functionは `verify_jwt=false` ですが、POST専用かつ `x-weather-cron-token` ヘッダーで検証します。設定がなければWeatherAPIにアクセスしません。
 - CronはVaultの暗号化シークレットからトークンを読み取って呼び出します。ソースコードにはトークンを含めません。
-- Edge FunctionはSupabaseのサーバー側管理キーで `daily` の天気項目だけを upsert します。既存の予定・給食・ゴミは変更しません。
+- Edge FunctionはSupabaseのサーバー側管理キーで `daily` の天気項目のみを更新し、未登録の日は追加します。既存の予定・給食・ゴミは変更しません。
 - APIキーはサーバー実行時の環境変数からだけ取得します。
 
-## 作業残
+## 動作状況・作業残
 
-- シークレット登録
-- 初回手動実行／翌朝実行の動作確認
-- 旧GASからの切替判断
+- 2026-10-08 にSecret登録・手動実行・HTTP 200・予報3日分保存を確認済み。
+- 2026-10-08 に毎朝5:35から毎朝5:00 JSTへ変更済み。
+- 翌朝の定期実行結果を確認する。
+- 旧GASの通知・スプレッドシートとのデータ切り替えは別途判断する。
