@@ -202,56 +202,15 @@ details.help summary{color:var(--navy);cursor:pointer;font-size:12px}
   .agenda-date-section{padding:16px 0}
 }
 
-/* Date-first single sheet: soft color on just the two day headers, not separate cards. */
-.agenda-date-section .agenda-day-top{
-  display:grid;
-  grid-template-columns:max-content minmax(0,1fr);
-  align-items:center;
-  gap:7px;
-  margin:-14px -14px 11px;
-  padding:12px 14px;
-  border-bottom:1px solid #dfebf2;
+/* Gentle date markers: no colored bars, no crammed weather line. */
+.agenda-date-section:first-child .agenda-date::after,
+.agenda-date-section:nth-child(2) .agenda-date::after{
+  content:"";display:inline-block;vertical-align:middle;
+  width:6px;height:6px;margin-left:8px;border-radius:50%;
 }
-.agenda-date-section:first-child .agenda-day-top{
-  background:linear-gradient(110deg,#e4f2fc,#f2f7fd);
-}
-.agenda-date-section:nth-child(2) .agenda-day-top{
-  background:linear-gradient(110deg,#edf7ed,#f8fbf6);
-}
-.agenda-day-top .agenda-date{
-  white-space:nowrap;
-  min-height:28px;
-  font-size:16px;
-}
-.agenda-day-top .agenda-weather{
-  justify-self:end;
-  width:max-content;
-  max-width:100%;
-  overflow:visible;
-  text-align:right;
-  white-space:nowrap;
-  font-size:clamp(10px,2.95vw,12px);
-  line-height:1.35;
-  letter-spacing:-.025em;
-}
-.agenda-day-top .agenda-weather .weather-summary,
-.agenda-day-top .agenda-weather strong{
-  font-size:inherit;
-  line-height:inherit;
-  white-space:nowrap;
-}
-.agenda-day-top .agenda-weather.tomorrow-weather{
-  display:flex;
-  align-items:center;
-  justify-content:flex-end;
-  flex-wrap:nowrap;
-  gap:0 3px;
-}
-.agenda-day-top .agenda-weather .tomorrow-forecast{white-space:nowrap}
-.agenda-day-top .weather-icon{font-size:1.15em;vertical-align:-1px}
-.agenda-day-top .rain-alert{font-size:1.1em;margin-left:1px}
-.agenda-date-section .agenda-day-details{margin-top:0}
-@media(min-width:690px){
-  .agenda-date-section .agenda-day-top{margin:-16px -20px 13px;padding:13px 20px}
-  .agenda-day-top .agenda-weather{font-size:13px}
-}
+.agenda-date-section:first-child .agenda-date::after{background:#8dbbe0}
+.agenda-date-section:nth-child(2) .agenda-date::after{background:#a9cda7}
+.agenda-day-top{row-gap:6px}
+.agenda-weather{font-size:13px;line-height:1.55;letter-spacing:0}
+.agenda-weather .weather-summary{font-size:inherit}
+.agenda-date-section .agenda-day-details{margin-top:12px}
