@@ -152,3 +152,22 @@ details.help summary{color:var(--navy);cursor:pointer;font-size:12px}
 .tomorrow-weather strong{font-size:12px}
 .tomorrow-forecast{white-space:nowrap}
 .tomorrow-lunch{white-space:pre-line;overflow-wrap:anywhere}
+
+/* Arrange the dashboard as three non-overlapping periods: today, tomorrow, then later. */
+.today-panel{padding:0;overflow:hidden;border-color:#d3e4f0}
+.today-panel .weather-head{border:0;border-bottom:1px solid #d2e4f2;border-radius:0;margin:0;padding:12px 13px;background:linear-gradient(120deg,#e3f1fc,#f5f8fe)}
+.today-body{padding:12px 13px}
+.today-body .highlights-grid{margin-bottom:8px}
+.today-agenda-block{border-top:1px solid var(--line);padding-top:11px}
+.today-agenda-block h2{margin:0 0 4px;font-size:13px}
+.dayrow-inline{display:block;border:0;padding:1px 0}
+.dayrow-inline .daycontent{min-width:0}
+.dayrow-inline .empty{padding:2px 0}
+.tomorrow-card{border-color:#d9e8d9;background:#f7fbf7}
+.tomorrow-date-button{display:inline-block;border:0;padding:0;text-align:left;background:transparent;color:var(--ink);font-size:inherit;font-weight:inherit;line-height:inherit}
+.tomorrow-card h2{margin-bottom:6px}
+.tomorrow-card .tomorrow-detail:last-of-type{padding-bottom:0}
+.weather-head .date-ref{font-size:16px}
+@media (min-width:690px){
+  .today-body .highlights-grid{gap:18px}
+}
