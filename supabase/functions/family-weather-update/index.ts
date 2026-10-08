@@ -77,10 +77,22 @@ Deno.serve(async(req:Request):Promise<Response>=>{
     }
     if(!rows.length)return json(502,{error:"no_valid_hourly_forecast"});
     const supabase=createClient(supabaseUrl,secretKey,{auth:{persistSession:false,autoRefreshToken:false}});
-    const {error}=await supabase.from("daily").upsert(rows,{onConflict:"day"});
-    if(error){
-      console.error("Weather DB update",error.code);
-      return json(500,{error:"database_update_failed"});
+    // Explicit UPDATE touches only weather columns; INSERT handles missing dates.
+    // Sparse UPSERT can accidentally replace unrelated fields on conflicting rows.
+    for(const weather of rows) {
+      const {day,...forecastFields}=weather;
+      const exists=await supabase.from("daily").select("day").eq("day",day).maybeSingle();
+      if(exists.error){
+        console.error("Weather DB lookup",exists.error.code);
+        return json(500,{error:"database_lookup_failed"});
+      }
+      const saved=exists.data
+        ? await supabase.from("daily").update(forecastFields).eq("day",day)
+        : await supabase.from("daily").insert({day,...forecastFields});
+      if(saved.error){
+        console.error("Weather DB update",saved.error.code);
+        return json(500,{error:"database_update_failed"});
+      }
     }
     console.log("Family weather updated",rows.length,"days");
     return json(200,{ok:true,updated_days:rows.map(x=>x.day)});
