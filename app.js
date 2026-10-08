@@ -69,7 +69,7 @@
       check(m);
       if(!m.data){$("denied-email").textContent=email;show("denied");return;}
       state.user=u.data.user;state.role=m.data.role;
-      $("user-label").textContent=email+(state.role==="admin"?" · 管理者":" · 家族");
+      $("user-label").textContent=state.role==="admin"?"管理者":"家族";
       $("settings-admin").hidden=state.role!=="admin";
       show("main");navigate("dashboard");
       if(location.search.includes("code="))history.replaceState(null,"",location.pathname);
@@ -99,7 +99,7 @@
     $("page-status").textContent="Supabase接続中 · "+new Date().toLocaleTimeString("ja-JP",{timeZone:"Asia/Tokyo",hour:"2-digit",minute:"2-digit"})+" 読込";
   }
   function line(label,value){
-    return value?'<div class="scheduleline"><span class="who">'+esc(label)+'</span>'+esc(value)+'</div>':"";
+    return value?'<div class="scheduleline"><span class="who">'+esc(label)+'</span><span class="schedule-text">'+esc(value)+'</span></div>':"";
   }
   function weatherPart(w,t,r){
     if(w==null&&t==null&&r==null)return "未登録";
@@ -116,8 +116,17 @@
     $("today-lunch").innerHTML=now.lunch?'<div class="scheduleline">'+esc(now.lunch)+'</div>':'<p class="empty">給食は未登録</p>';
     $("today-garbage").innerHTML=now.garbage?'<div class="scheduleline">'+esc(now.garbage)+'</div>':'<p class="empty">ゴミは未登録</p>';
     $("schedule-list").innerHTML=Array.from({length:9},(_,i)=>{
-      const d=dateAdd(today,i),row=byDate.get(d)||{},lines=fields.map(k=>line(person[k],row[k])).join("");
-      return '<div class="dayrow'+(i===0?" today":"")+'"><button type="button" data-action="edit-day" data-day="'+d+'" class="daydate '+weekend(d)+'">'+(i===0?"今日":fmtDay(d))+'</button><div>'+(lines||'<div class="empty">予定なし</div>')+'<button type="button" class="schedule-edit" data-action="edit-day" data-day="'+d+'">✎ 編集</button></div></div>';
+      const d=dateAdd(today,i),row=byDate.get(d)||{};
+      const filled=fields.filter(k=>row[k]&&String(row[k]).trim());
+      const lines=filled.map(k=>line(person[k],row[k])).join("");
+      const preview=filled.map(k=>person[k]+" "+String(row[k]).replace(/\s+/g," ").trim()).join(" ／ ");
+      const isLong=preview.length>75||filled.some(k=>String(row[k]).split("\n").length>3);
+      const classes="dayrow"+(i===0?" today":"")+(isLong?" has-more":"")+(!filled.length?" no-schedule":"");
+      return '<div class="'+classes+'"><button type="button" data-action="edit-day" data-day="'+d+'" class="daydate '+weekend(d)+'">'+(i===0?"今日":fmtDay(d))+'</button><div class="daycontent">'+
+        (isLong?'<div class="schedule-preview">'+esc(preview)+'</div>':"")+
+        '<div class="schedule-full">'+(lines||'<div class="empty">予定なし</div>')+'</div>'+
+        '<div class="schedule-actions">'+(isLong?'<button type="button" class="schedule-toggle" data-action="toggle-schedule" aria-expanded="false">続きを読む ▼</button>':"")+
+        '<button type="button" class="schedule-edit" data-action="edit-day" data-day="'+d+'">✎ 編集</button></div></div></div>';
     }).join("");
     const due=state.cleaning.filter(c=>!c.next_due||c.next_due<=today);
     $("cleaning-due").innerHTML=due.length?due.map(c=>'<div class="itemrow"><div class="itemmain"><div class="item-title">'+esc(c.name)+'</div><div class="item-sub">次回 '+esc(c.next_due||"未設定")+'</div></div><button type="button" data-action="done-clean" data-id="'+esc(c.id)+'" class="btn secondary smallbtn">完了</button></div>').join(""):'<p class="empty">期限が来ている掃除はありません</p>';
@@ -276,6 +285,14 @@
       if(a==="refresh"){await refresh();toast("更新したよ！");}
       if(a==="goto-lunch"){state.mode="lunch";navigate("month");}
       if(a==="edit-day")await editDay(el.dataset.day);
+      if(a==="toggle-schedule"){
+        const row=el.closest(".dayrow");
+        if(row){
+          const expanded=row.classList.toggle("expanded");
+          el.setAttribute("aria-expanded",String(expanded));
+          el.textContent=expanded?"折りたたむ ▲":"続きを読む ▼";
+        }
+      }
       if(a==="close")closeModal();
       if(a==="expand-day"){const d=el.dataset.day;state.opened.has(d)?state.opened.delete(d):state.opened.add(d);renderMonth();}
       if(a==="mode"){state.mode=el.dataset.mode;renderMonth();}
