@@ -40,6 +40,18 @@
         <button id="today-date" class="date-ref" data-action="refresh" type="button" title="タップして最新データを読み込む">読み込み中</button>
         <div id="weather-summary" class="weather-summary"></div>
       </div>
+      <section class="card today-highlights" aria-label="今日の給食とゴミ出し">
+        <div class="highlights-grid">
+          <div class="highlight-block">
+            <div class="highlight-heading"><strong>🍱 給食</strong><button class="btn ghost smallbtn" data-action="goto-lunch" type="button">献立編集 ›</button></div>
+            <div id="today-lunch" class="highlight-text"></div>
+          </div>
+          <div class="highlight-block">
+            <div class="highlight-heading"><strong>🗑️ 今日のゴミ</strong></div>
+            <div id="today-garbage" class="highlight-text"></div>
+          </div>
+        </div>
+      </section>
       <div class="dashgrid">
         <div>
           <section class="card">
@@ -49,14 +61,7 @@
         </div>
         <div>
           <section class="card">
-            <div class="between"><h2>給食</h2><button class="btn ghost smallbtn" data-action="goto-lunch" type="button">献立編集 ›</button></div>
-            <div id="today-lunch"></div>
-          </section>
-          <section class="card">
-            <div class="between"><h2>掃除・ゴミ</h2><button class="btn ghost smallbtn" data-tab="cleaning" type="button">掃除一覧 ›</button></div>
-            <div class="small" style="margin:5px 0 7px;font-weight:700">今日のゴミ</div>
-            <div id="today-garbage"></div>
-            <div class="small" style="margin:13px 0 4px;font-weight:700">掃除の期限</div>
+            <div class="between"><h2>掃除の期限</h2><button class="btn ghost smallbtn" data-tab="cleaning" type="button">掃除一覧 ›</button></div>
             <div id="cleaning-due"></div>
           </section>
           <section class="card">
@@ -71,7 +76,7 @@
           </section>
         </div>
       </div>
-      <p class="tiny">※天気の自動更新は、Supabase側でキー登録・動作確認が済むまでは有効になりません。</p>
+      <p class="tiny weather-note">☀️ 天気は毎朝5:35に自動更新。日付をタップすると再読み込みできます。</p>
     </div>
 
     <div id="page-month" class="page">
