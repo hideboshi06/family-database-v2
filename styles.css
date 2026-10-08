@@ -7,10 +7,6 @@ button{cursor:pointer}
 a{color:var(--navy)}
 [hidden]{display:none!important}
 .shell{max-width:940px;padding:calc(15px + env(safe-area-inset-top)) 13px calc(102px + env(safe-area-inset-bottom));margin:auto}
-.site-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:2px 0 12px;padding:2px}
-.brand{margin:0;display:flex;align-items:center;gap:8px;font-size:16px;letter-spacing:-.025em;font-weight:750}
-.brand-icon{font-size:19px}
-.mini{font-size:11px;color:var(--sub)}
 .badge{border-radius:20px;background:var(--navylight);color:var(--navy);font-size:11px;padding:4px 9px;white-space:nowrap;font-weight:700}
 .card{border:1px solid var(--line);border-radius:15px;background:var(--paper);box-shadow:var(--shadow);padding:14px;margin-bottom:11px}
 .card h2{font-size:15px;margin:0 0 11px;font-weight:750;letter-spacing:-.012em}
@@ -102,9 +98,6 @@ details.help summary{color:var(--navy);cursor:pointer;font-size:12px}
 
 
 /* Mobile-first dashboard: put essential information before the nine-day schedule. */
-.site-head{min-height:38px}
-.brand{white-space:nowrap;flex-shrink:0}
-.site-head .mini{white-space:nowrap;font-size:11px;padding:4px 8px;border:1px solid var(--line);border-radius:999px;background:#fff}
 .today-highlights{padding:10px 13px}
 .highlights-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:0}
 .highlight-block{min-width:0;padding:5px 1px 9px}
@@ -123,11 +116,8 @@ details.help summary{color:var(--navy);cursor:pointer;font-size:12px}
 .schedule-preview{display:none}
 .schedule-toggle{display:none;min-height:34px;border:0;background:transparent;color:var(--navy);padding:6px 2px;font-size:12px;font-weight:700}
 .dayrow.no-schedule .empty{padding:5px 0}
-.weather-note{margin:6px 2px}
 @media (max-width:689px){
   .shell{padding-top:calc(9px + env(safe-area-inset-top))}
-  .site-head{margin-bottom:10px}
-  .brand{font-size:16px;gap:6px}
   .badge{font-size:10px;padding:3px 7px}
   .weather-head{padding:10px 11px}
   .dayrow.has-more:not(.expanded) .schedule-full{display:none}
@@ -149,3 +139,16 @@ details.help summary{color:var(--navy);cursor:pointer;font-size:12px}
 .weather-icon{font-size:17px;line-height:1;vertical-align:-1px;white-space:nowrap}
 .rain-alert{font-size:16px;line-height:1;white-space:nowrap;margin-left:2px}
 .daydate{cursor:pointer}
+
+/* iPhone dashboard: tomorrow's nursery essentials stay above the long schedule. */
+.weather-head{flex-wrap:wrap;row-gap:3px;min-height:55px}
+.tomorrow-card{border-color:#d6e4ee;background:#fbfdff;padding:12px 14px}
+.tomorrow-card h2{margin-bottom:6px;font-size:15px}
+.tomorrow-detail{display:grid;grid-template-columns:42px minmax(0,1fr);gap:8px;align-items:start;padding:7px 0}
+.tomorrow-detail+.tomorrow-detail{border-top:1px solid #e7edf2}
+.tomorrow-label{font-size:12px;font-weight:750;color:var(--sub);padding-top:3px}
+.tomorrow-value{font-size:13px;line-height:1.65;min-width:0}
+.tomorrow-weather{display:flex;align-items:center;flex-wrap:wrap;gap:0 5px}
+.tomorrow-weather strong{font-size:12px}
+.tomorrow-forecast{white-space:nowrap}
+.tomorrow-lunch{white-space:pre-line;overflow-wrap:anywhere}
