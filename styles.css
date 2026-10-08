@@ -1,0 +1,102 @@
+:root{color-scheme:light;--bg:#f3f7fa;--paper:#fff;--ink:#25384d;--sub:#6b7e8f;--line:#dfe7ee;--navy:#2d6595;--navylight:#eaf2f9;--light:#f8fafc;--red:#ad5662;--blue:#3978ba;--ok:#187150;--shadow:0 6px 20px rgba(41,68,93,.055)}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.48 -apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;-webkit-font-smoothing:antialiased}
+button,input,textarea,select{font:inherit}
+button{cursor:pointer}
+a{color:var(--navy)}
+[hidden]{display:none!important}
+.shell{max-width:940px;padding:calc(15px + env(safe-area-inset-top)) 13px calc(102px + env(safe-area-inset-bottom));margin:auto}
+.site-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:2px 0 12px;padding:2px}
+.brand{margin:0;display:flex;align-items:center;gap:8px;font-size:16px;letter-spacing:-.025em;font-weight:750}
+.brand-icon{font-size:19px}
+.mini{font-size:11px;color:var(--sub)}
+.badge{border-radius:20px;background:var(--navylight);color:var(--navy);font-size:11px;padding:4px 9px;white-space:nowrap;font-weight:700}
+.card{border:1px solid var(--line);border-radius:15px;background:var(--paper);box-shadow:var(--shadow);padding:14px;margin-bottom:11px}
+.card h2{font-size:15px;margin:0 0 11px;font-weight:750;letter-spacing:-.012em}
+.card p{margin:6px 0}
+.inline{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.between{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.small{font-size:12px;color:var(--sub)}
+.tiny{font-size:11px;color:var(--sub)}
+.muted{color:var(--sub)}
+.empty{color:#7e8c99;font-size:12px;padding:9px 0}
+.btn{background:var(--navy);color:#fff;border:1px solid var(--navy);border-radius:10px;padding:9px 14px;font-weight:700;min-height:38px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.secondary{background:#fff;color:var(--navy);border:1px solid #bed2e2}
+.btn.ghost{background:transparent;color:var(--navy);border-color:transparent}
+.btn.smallbtn{padding:5px 10px;min-height:32px;font-size:12px}
+.btn.danger{color:var(--red);border-color:#f0d5d5;background:#fff}
+.btn.full{width:100%;min-height:46px}
+.status{font-size:12px;color:var(--sub);margin:8px 0}
+.status.err{color:var(--red)}
+.status.ok{color:var(--ok)}
+.page{display:none}
+.page.active{display:block}
+.tabbar{position:fixed;bottom:0;left:0;right:0;z-index:20;background:rgba(255,255,255,.97);border-top:1px solid var(--line);padding:8px max(8px,env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom));display:flex;justify-content:center;gap:4px;backdrop-filter:blur(12px)}
+.tabbar button{border:0;border-radius:10px;color:#708194;background:transparent;display:grid;gap:3px;justify-items:center;min-width:0;width:18%;max-width:130px;padding:5px 2px;font-size:11px}
+.tabbar button .ico{font-size:20px}
+.tabbar button.active{background:var(--navylight);color:var(--navy);font-weight:800}
+.weather-head{background:linear-gradient(120deg,#e3f1fc,#f5f8fe);border:1px solid #d2e4f2;border-radius:13px;padding:11px 12px;margin-bottom:11px;display:flex;align-items:center;gap:9px}
+.date-ref{background:transparent;border:0;padding:0;color:var(--ink);font-weight:800;white-space:nowrap;font-size:17px}
+.weather-summary{min-width:0;font-size:12px;line-height:1.5}
+.weather-summary strong{font-weight:750}
+.dayrow{display:grid;grid-template-columns:57px minmax(0,1fr);gap:10px;border-top:1px solid #edf1f4;padding:10px 0}
+.dayrow:first-of-type{border-top:0}
+.daydate{border:0;background:transparent;text-align:left;padding:1px 0;font-weight:750;color:var(--ink);font-size:13px;align-self:start}
+.daydate.sat,.monthdate.sat{color:var(--blue)}
+.daydate.sun,.monthdate.sun{color:var(--red)}
+.dayrow.today .daydate{background:#e7f0f8;padding:6px;border-radius:8px}
+.scheduleline{white-space:pre-line;overflow-wrap:anywhere;margin:0 0 3px}
+.who{display:inline-block;min-width:4.7em;font-size:11px;color:var(--sub);font-weight:700}
+.schedule-edit{font-size:12px;color:var(--navy);border:0;background:transparent;padding:4px 0}
+.section-actions{display:flex;align-items:center;gap:8px}
+.itemrow{border-top:1px solid #eff2f6;display:flex;align-items:center;justify-content:space-between;gap:9px;padding:10px 0}
+.itemrow:first-child{border-top:0}
+.itemmain{min-width:0;flex:1}
+.item-title{font-weight:650}
+.item-sub{font-size:11px;color:var(--sub);margin-top:3px;white-space:pre-line}
+.checkboxlabel{display:flex;align-items:center;gap:8px;min-width:0;flex:1}
+input[type=checkbox]{width:18px;height:18px;accent-color:var(--navy);flex:0 0 auto}
+.input,textarea,select{display:block;width:100%;background:#fff;border:1px solid #cbd8e2;border-radius:9px;padding:10px 11px;color:var(--ink);outline-offset:2px}
+textarea{min-height:76px;resize:vertical;line-height:1.5}
+label.field{font-size:12px;color:#526679;font-weight:700;display:block;margin:10px 0 5px}
+.editor-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.select{width:auto;max-width:100%}
+.month-header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 12px}
+.month-title{font-size:17px;font-weight:800}
+.choice{display:flex;border:1px solid var(--line);background:#f4f7fa;border-radius:11px;overflow:hidden;flex:1;max-width:350px}
+.choice button{flex:1;border:0;background:transparent;color:var(--sub);padding:9px 8px;font-weight:700;font-size:12px}
+.choice button.active{background:var(--navy);color:#fff}
+.month-list{display:grid;gap:8px}
+.monthday{border:1px solid var(--line);border-radius:11px;overflow:hidden;background:#fff}
+.monthtop{display:flex;align-items:center;justify-content:space-between;padding:11px 12px;gap:9px;width:100%;background:#fff;border:0;text-align:left}
+.monthdate{font-weight:750;font-size:13px}
+.monthpreview{font-size:11px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0;text-align:right}
+.monthfields{border-top:1px solid var(--line);background:#fafdff;padding:11px}
+.monthfields textarea{min-height:64px}
+.monthday.dirty{border-color:#86acd0}
+.changedmark{display:inline-block;color:var(--ok);font-size:10px;margin-left:6px}
+.savebar{position:sticky;bottom:calc(70px + env(safe-area-inset-bottom));z-index:5;background:#fff;border:1px solid var(--line);border-radius:12px;padding:9px;box-shadow:0 6px 15px rgba(25,50,70,.14);display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:13px}
+.savebar .btn{min-width:110px}
+.login-wrap{max-width:430px;margin:8vh auto 0}
+.login-icon{font-size:28px;background:#e8f2fb;padding:12px;display:inline-grid;place-items:center;border-radius:17px}
+.login-title{font-size:22px;line-height:1.25;margin:14px 0 9px}
+.login-blurb{font-size:13px;color:var(--sub);margin:0 0 23px}
+.googlebtn{background:#fff;border:1px solid #bfccd7;color:#263a4c;width:100%;min-height:48px;border-radius:11px;font-weight:700}
+.overlay{position:fixed;inset:0;z-index:40;background:rgba(22,37,54,.45);display:grid;align-items:end;justify-items:center;padding:10px}
+.sheetmodal{width:100%;max-width:600px;max-height:90vh;overflow:auto;background:#fff;border-radius:16px 16px 12px 12px;padding:18px}
+.sheetmodal h2{margin:3px 0 13px;font-size:17px}
+.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:17px;align-items:center}
+.notice{font-size:12px;color:var(--sub);background:#f0f6fa;border-radius:9px;padding:10px;margin:9px 0}
+.toast{position:fixed;z-index:100;bottom:calc(85px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);max-width:92%;border-radius:10px;background:#2c455c;color:#fff;padding:10px 15px;box-shadow:0 5px 15px #0003;font-size:13px}
+details.help summary{color:var(--navy);cursor:pointer;font-size:12px}
+.settings-member{padding:10px 0;border-top:1px solid var(--line)}
+@media (min-width:690px){
+  .shell{padding:25px 24px 110px}
+  .dashgrid{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:12px;align-items:start}
+  .dashgrid .card{margin-bottom:12px}
+  .month-list{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .overlay{align-items:center}
+  .sheetmodal{border-radius:17px}
+}
