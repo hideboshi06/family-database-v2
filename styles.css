@@ -248,3 +248,16 @@ details.help summary{color:var(--navy);cursor:pointer;font-size:12px}
   .daily-body{padding:15px 20px 18px;gap:10px}
   .future-card{padding:5px 20px}
 }
+
+/* iPad Safari OAuth: second, direct user-tap link avoids async navigation limitations. */
+.oauth-link{
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  text-align:center;
+  text-decoration:none;
+  color:var(--ink);
+  padding:10px 16px;
+  margin-top:10px;
+}
+.oauth-tip{margin-top:12px!important;line-height:1.65}
