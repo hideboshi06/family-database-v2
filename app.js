@@ -115,7 +115,7 @@
     if(/晴|快晴|日差し/i.test(text))return "☀️";
     return existing?existing[0]:text;
   }
-  function weatherPart(w,t,r){
+  function weatherPart(w,t,r,compact=false){
     if(w==null&&t==null&&r==null)return "未登録";
     const condition=String(w||"");
     const icon=weatherEmoji(condition);
@@ -123,8 +123,9 @@
     // The umbrella appears to the right of precipitation probability at 60% or more.
     const umbrella=r!=null&&Number.parseFloat(String(r))>=60
       ?' <span class="rain-alert" role="img" aria-label="傘が必要な降水確率">☂️</span>':"";
-    return '<span class="weather-icon" role="img" aria-label="'+esc(condition||"天気不明")+'">'+esc(icon)+'</span> '+
-      (t==null?"–":esc(t))+"℃ "+rain+"%"+umbrella;
+    const gap=compact?"":" ";
+    return '<span class="weather-icon" role="img" aria-label="'+esc(condition||"天気不明")+'">'+esc(icon)+'</span>'+gap+
+      (t==null?"–":esc(t))+"℃"+gap+rain+"%"+umbrella;
   }
   function shoppingRow(x,brief=false){
     return '<div class="itemrow"><label class="checkboxlabel"><input type="checkbox" data-action="shopping-needed" data-id="'+esc(x.id)+'" '+(x.needed?"checked":"")+'><span class="itemmain"><span class="item-title">'+esc(x.product)+(x.quantity?' <span class="tiny">×'+esc(x.quantity)+'</span>':"")+'</span><span class="item-sub" style="display:block">'+esc(brief?(x.note||""):[x.note,x.store].filter(Boolean).join(" · "))+'</span></span></label>'+
@@ -151,7 +152,7 @@
     const today=isoToday(),byDate=new Map(state.daily.map(x=>[x.day,x])),now=byDate.get(today)||{};
     $("today-date").textContent=fmtDay(today);
     $("today-date").dataset.day=today;
-    $("weather-summary").innerHTML='<div class="weather-summary"><strong>朝</strong> '+weatherPart(now.morning_weather,now.morning_temp_c,now.morning_rain_pct)+' <span class="muted">／</span> <strong>夕</strong> '+weatherPart(now.evening_weather,now.evening_temp_c,now.evening_rain_pct)+'</div>';
+    $("weather-summary").innerHTML='<div class="weather-summary"><strong>朝</strong>'+weatherPart(now.morning_weather,now.morning_temp_c,now.morning_rain_pct,true)+' <span class="muted">／</span> <strong>夕</strong>'+weatherPart(now.evening_weather,now.evening_temp_c,now.evening_rain_pct,true)+'</div>';
     $("today-lunch").innerHTML=now.lunch?'<div class="scheduleline">'+esc(now.lunch)+'</div>':'<p class="empty">給食は未登録</p>';
     $("today-garbage").innerHTML=now.garbage?'<div class="scheduleline">'+esc(now.garbage)+'</div>':'<p class="empty">ゴミは未登録</p>';
     const todayHasPlans=filledAgendaFields(now).length>0;
@@ -161,8 +162,8 @@
     const tomorrow=dateAdd(today,1),next=byDate.get(tomorrow)||{};
     $("tomorrow-title").textContent=fmtDay(tomorrow);
     $("tomorrow-title").dataset.day=tomorrow;
-    $("tomorrow-weather").innerHTML='<span class="tomorrow-forecast"><strong>朝</strong> '+weatherPart(next.morning_weather,next.morning_temp_c,next.morning_rain_pct)+'</span>'+
-      ' <span class="muted">／</span> <span class="tomorrow-forecast"><strong>夕</strong> '+weatherPart(next.evening_weather,next.evening_temp_c,next.evening_rain_pct)+'</span>';
+    $("tomorrow-weather").innerHTML='<span class="tomorrow-forecast"><strong>朝</strong>'+weatherPart(next.morning_weather,next.morning_temp_c,next.morning_rain_pct,true)+'</span>'+
+      ' <span class="muted">／</span> <span class="tomorrow-forecast"><strong>夕</strong>'+weatherPart(next.evening_weather,next.evening_temp_c,next.evening_rain_pct,true)+'</span>';
     $("tomorrow-lunch").textContent=next.lunch||"給食は未登録";
     const tomorrowHasPlans=filledAgendaFields(next).length>0;
     $("tomorrow-agenda-block").hidden=!tomorrowHasPlans;
