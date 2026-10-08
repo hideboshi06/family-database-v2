@@ -101,9 +101,31 @@
   function line(label,value){
     return value?'<div class="scheduleline"><span class="who">'+esc(label)+'</span><span class="schedule-text">'+esc(value)+'</span></div>':"";
   }
+  function weatherEmoji(condition){
+    const text=String(condition||"").trim();
+    if(!text)return "❔";
+    // Older imported sheet data may already contain a weather emoji.
+    const existing=text.match(/[☀🌤⛅🌥☁🌦🌧⛈🌩🌨❄🌙🌫]/u);
+    if(existing&&!/[ぁ-んァ-ン一-龯]/u.test(text))return existing[0]==="☀"?"☀️":existing[0];
+    if(/雷|稲妻/i.test(text))return "⛈️";
+    if(/雪|吹雪|みぞれ|霰|雹|氷粒/i.test(text))return "❄️";
+    if(/雨|小雨|霧雨|豪雨|にわか雨|しぐれ/i.test(text))return "🌧️";
+    if(/霧|もや|靄|霞/i.test(text))return "🌫️";
+    if(/晴|快晴/i.test(text)&&/曇|くもり|雲/i.test(text))return "⛅";
+    if(/曇|くもり|雲/i.test(text))return "☁️";
+    if(/晴|快晴|日差し/i.test(text))return "☀️";
+    return existing?existing[0]:text;
+  }
   function weatherPart(w,t,r){
     if(w==null&&t==null&&r==null)return "未登録";
-    return esc(w||"")+" "+(t==null?"–":esc(t))+"℃ "+(r==null?"–":esc(r))+"%";
+    const condition=String(w||"");
+    const icon=weatherEmoji(condition);
+    const rain=r==null?"–":esc(r);
+    // The umbrella appears to the right of precipitation probability at 60% or more.
+    const umbrella=r!=null&&Number.parseFloat(String(r))>=60
+      ?' <span class="rain-alert" role="img" aria-label="傘が必要な降水確率">☂️</span>':"";
+    return '<span class="weather-icon" role="img" aria-label="'+esc(condition||"天気不明")+'">'+esc(icon)+'</span> '+
+      (t==null?"–":esc(t))+"℃ "+rain+"%"+umbrella;
   }
   function shoppingRow(x,brief=false){
     return '<div class="itemrow"><label class="checkboxlabel"><input type="checkbox" data-action="shopping-needed" data-id="'+esc(x.id)+'" '+(x.needed?"checked":"")+'><span class="itemmain"><span class="item-title">'+esc(x.product)+(x.quantity?' <span class="tiny">×'+esc(x.quantity)+'</span>':"")+'</span><span class="item-sub" style="display:block">'+esc(brief?(x.note||""):[x.note,x.store].filter(Boolean).join(" · "))+'</span></span></label>'+
@@ -125,8 +147,8 @@
       return '<div class="'+classes+'"><button type="button" data-action="edit-day" data-day="'+d+'" class="daydate '+weekend(d)+'">'+(i===0?"今日":fmtDay(d))+'</button><div class="daycontent">'+
         (isLong?'<div class="schedule-preview">'+esc(preview)+'</div>':"")+
         '<div class="schedule-full">'+(lines||'<div class="empty">予定なし</div>')+'</div>'+
-        '<div class="schedule-actions">'+(isLong?'<button type="button" class="schedule-toggle" data-action="toggle-schedule" aria-expanded="false">続きを読む ▼</button>':"")+
-        '<button type="button" class="schedule-edit" data-action="edit-day" data-day="'+d+'">✎ 編集</button></div></div></div>';
+        (isLong?'<div class="schedule-actions"><button type="button" class="schedule-toggle" data-action="toggle-schedule" aria-expanded="false">続きを読む ▼</button></div>':"")+
+        '</div></div>';
     }).join("");
     const due=state.cleaning.filter(c=>!c.next_due||c.next_due<=today);
     $("cleaning-due").innerHTML=due.length?due.map(c=>'<div class="itemrow"><div class="itemmain"><div class="item-title">'+esc(c.name)+'</div><div class="item-sub">次回 '+esc(c.next_due||"未設定")+'</div></div><button type="button" data-action="done-clean" data-id="'+esc(c.id)+'" class="btn secondary smallbtn">完了</button></div>').join(""):'<p class="empty">期限が来ている掃除はありません</p>';
