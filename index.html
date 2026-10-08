@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f4f7fa">
+  <meta name="description" content="Family Database v2 - 家族の予定と暮らしの情報をひとつに。">
+  <title>Family Database</title>
+  <style>
+    :root { color-scheme: light; --bg:#f4f7fa; --paper:#fff; --ink:#213449; --muted:#65758a; --line:#e2e8f0; --accent:#28659e; --soft:#eef5fb; --ok:#126d4b; --danger:#a03f32; }
+    * { box-sizing:border-box; }
+    html, body { margin:0; min-height:100%; }
+    body { font-family:-apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif; color:var(--ink); background:var(--bg); line-height:1.55; -webkit-font-smoothing:antialiased; }
+    body::before { content:""; position:fixed; inset:0 0 auto; height:240px; background:linear-gradient(180deg,#e7f1f9,rgba(231,241,249,0)); pointer-events:none; }
+    .page { position:relative; max-width:680px; margin:auto; padding:calc(26px + env(safe-area-inset-top)) 18px calc(36px + env(safe-area-inset-bottom)); }
+    .brand { display:flex; align-items:center; gap:12px; margin:8px 0 28px; }
+    .mark { display:grid; place-items:center; width:44px; height:44px; border-radius:15px; background:#dceaf8; font-size:24px; }
+    .brand h1 { margin:0; font-size:21px; letter-spacing:-.035em; line-height:1.2; }
+    .brand p { margin:3px 0 0; color:var(--muted); font-size:12px; }
+    .panel { background:var(--paper); border:1px solid var(--line); border-radius:19px; padding:24px; box-shadow:0 8px 25px rgba(31,58,86,.035); margin:16px 0; }
+    .panel h2 { margin:0 0 10px; font-size:19px; }
+    .lead { font-size:14px; color:var(--muted); margin:0 0 24px; }
+    .symbol { width:54px; height:54px; display:grid; place-items:center; font-size:27px; border-radius:16px; background:var(--soft); margin-bottom:18px; }
+    button { font:inherit; cursor:pointer; }
+    .primary { display:flex; align-items:center; justify-content:center; gap:12px; width:100%; min-height:52px; padding:13px 16px; background:var(--accent); color:#fff; border:0; border-radius:13px; font-weight:700; font-size:15px; }
+    .primary:disabled { opacity:.6; cursor:wait; }
+    .google { background:#fff; color:#24364b; border:1px solid #cbd5e1; box-shadow:0 2px 5px rgba(30,42,56,.06); }
+    .google-icon { color:#4285f4; font-size:20px; font-weight:800; font-family:Arial,sans-serif; }
+    .secondary { padding:10px 15px; background:#fff; border:1px solid var(--line); color:var(--accent); border-radius:11px; font-weight:600; }
+    .note { color:var(--muted); font-size:12px; margin:15px 0 0; }
+    .error { color:var(--danger); font-size:13px; margin-top:15px; white-space:pre-wrap; overflow-wrap:anywhere; }
+    .success { color:var(--ok); font-weight:700; font-size:14px; margin:0 0 7px; }
+    .topline { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:18px; }
+    .topline h2 { margin:0; font-size:20px; }
+    .account { font-size:12px; color:var(--muted); overflow-wrap:anywhere; margin:0 0 12px; }
+    .stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:9px; margin-top:16px; }
+    .stat { border-radius:12px; padding:13px 8px; text-align:center; background:var(--soft); }
+    .stat strong { display:block; font-size:26px; color:var(--accent); font-variant-numeric:tabular-nums; }
+    .stat span { display:block; font-size:11px; color:var(--muted); }
+    .day { border-top:1px solid var(--line); padding:11px 0; }
+    .day-date { font-size:13px; font-weight:700; color:var(--ink); margin-bottom:4px; }
+    .item { font-size:13px; margin:2px 0; white-space:pre-line; overflow-wrap:anywhere; }
+    .item b { color:var(--muted); font-size:11px; font-weight:600; margin-right:8px; }
+    .empty { font-size:13px; color:var(--muted); }
+    .footer { margin:24px 0 0; text-align:center; font-size:11px; color:#8592a1; }
+    [hidden] { display:none !important; }
+    @media (min-width:600px) { .page { padding-top:58px; } .panel { padding:30px; } }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="brand">
+      <div class="mark" aria-hidden="true">🏠</div>
+      <div><h1>Family Database</h1><p>家族の毎日を、ひとつに。<span aria-label="バージョン">v2</span></p></div>
+    </header>
+
+    <section id="loading" class="panel" role="status" aria-live="polite">
+      <h2>接続を確認しています…</h2>
+      <p class="lead" style="margin:0">少しだけお待ちください。</p>
+    </section>
+
+    <section id="login" class="panel" hidden>
+      <div class="symbol" aria-hidden="true">🔐</div>
+      <h2>家族専用ログイン</h2>
+      <p class="lead">登録されたGoogleアカウントでログインしてください。家族の予定や買い物データは、ログインした家族だけが見られます。</p>
+      <button class="primary google" id="login-button" type="button"><span class="google-icon" aria-hidden="true">G</span>Googleでログイン</button>
+      <p class="note">初回はGoogleのログイン画面に移動します。</p>
+      <p class="error" id="login-error" hidden role="alert"></p>
+    </section>
+
+    <section id="denied" class="panel" hidden>
+      <div class="symbol" aria-hidden="true">🔒</div>
+      <h2>アクセスが許可されていません</h2>
+      <p class="lead">Googleログインはできましたが、このアカウントは家族メンバーに登録されていません。</p>
+      <p class="account" id="denied-email"></p>
+      <button id="switch-account" type="button" class="primary">別のGoogleアカウントでログイン</button>
+      <p class="note">登録が必要な場合は管理者に連絡してください。</p>
+    </section>
+
+    <section id="app" hidden>
+      <section class="panel">
+        <div class="topline">
+          <h2>接続できました！</h2>
+          <button class="secondary" id="logout-button" type="button">ログアウト</button>
+        </div>
+        <p class="success">✓ 家族専用データベースに接続中</p>
+        <p class="account" id="user-email"></p>
+        <p class="lead" style="margin-bottom:7px">Supabaseから取得した件数を表示しています。</p>
+        <div class="stats" aria-label="データ件数">
+          <div class="stat"><strong id="stat-daily">–</strong><span>日次</span></div>
+          <div class="stat"><strong id="stat-cleaning">–</strong><span>掃除</span></div>
+          <div class="stat"><strong id="stat-shopping">–</strong><span>買い物</span></div>
+        </div>
+        <p class="error" id="data-error" role="alert" hidden></p>
+      </section>
+      <section class="panel">
+        <h2>これからの予定</h2>
+        <p class="note" style="margin-top:0;margin-bottom:13px">スプレッドシートから移行したデータを表示</p>
+        <div id="days"><p class="empty">読み込み中…</p></div>
+      </section>
+      <p class="note">まずはGoogleログインとデータ参照の動作確認版。予定・給食の月間編集、掃除・買い物の操作画面はこれから追加します。</p>
+    </section>
+
+    <footer class="footer">Family Database v2 · GitHub Pages + Supabase</footer>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script>
+    "use strict";
+    const SUPABASE_URL = "https://besevrrmhwmkdqmoiscf.supabase.co";
+    const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_oo7Bdb8Ip-icb6Y0nqovKg_OH9Taql2";
+    const $ = (id) => document.getElementById(id);
+    const views = ["loading", "login", "denied", "app"];
+    function show(name) { views.forEach(id => { $(id).hidden = id !== name; }); }
+    function explain(error) { return error && error.message ? error.message : String(error || "不明なエラー"); }
+    function japanToday() {
+      const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone:"Asia/Tokyo", year:"numeric", month:"2-digit", day:"2-digit"
+      }).formatToParts(new Date());
+      const pick = name => parts.find(part => part.type === name).value;
+      return pick("year") + "-" + pick("month") + "-" + pick("day");
+    }
+    function addText(parent, tag, text, className) {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      node.textContent = text;
+      parent.appendChild(node);
+      return node;
+    }
+    function displayDays(rows) {
+      const root = $("days");
+      root.replaceChildren();
+      if (!rows.length) { addText(root, "p", "今後の登録済み予定はありません。", "empty"); return; }
+      for (const day of rows) {
+        const box = addText(root, "div", "", "day");
+        const label = new Date(day.day + "T12:00:00+09:00").toLocaleDateString("ja-JP",{
+          timeZone:"Asia/Tokyo", month:"numeric", day:"numeric", weekday:"short"
+        });
+        addText(box, "div", label, "day-date");
+        let any = false;
+        for (const [key, title] of [["kai","カイ"],["papa","パパ"],["mama","ママ"],["event","イベント"],["lunch","給食"]]) {
+          if (!day[key]) continue;
+          const line = document.createElement("div");
+          line.className = "item";
+          addText(line, "b", title);
+          addText(line, "span", day[key]);
+          box.appendChild(line);
+          any = true;
+        }
+        if (!any) addText(box, "div", "登録なし", "empty");
+      }
+    }
+
+    async function start() {
+      show("loading");
+      if (!window.supabase || !window.supabase.createClient) {
+        show("login");
+        $("login-error").hidden = false;
+        $("login-error").textContent = "ログイン用ライブラリを読み込めませんでした。ネットワーク接続を確認して再読み込みしてください。";
+        $("login-button").disabled = true;
+        return;
+      }
+      const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+        auth: { flowType:"pkce", autoRefreshToken:true, persistSession:true, detectSessionInUrl:true }
+      });
+      async function login() {
+        $("login-error").hidden = true;
+        $("login-button").disabled = true;
+        const { error } = await client.auth.signInWithOAuth({
+          provider:"google",
+          options:{
+            redirectTo: window.location.origin + window.location.pathname,
+            queryParams:{ prompt:"select_account" }
+          }
+        });
+        if (error) {
+          $("login-button").disabled = false;
+          $("login-error").textContent = "ログインを開始できませんでした: " + explain(error);
+          $("login-error").hidden = false;
+        }
+      }
+      async function logout() {
+        await client.auth.signOut();
+        $("login-button").disabled = false;
+        show("login");
+      }
+      $("login-button").addEventListener("click", login);
+      $("logout-button").addEventListener("click", logout);
+      $("switch-account").addEventListener("click", logout);
+      const params = new URLSearchParams(window.location.search);
+      if (params.has("error")) {
+        show("login");
+        $("login-error").textContent = params.get("error_description") || params.get("error");
+        $("login-error").hidden = false;
+        return;
+      }
+      try {
+        const { data: sessionData, error: sessionError } = await client.auth.getSession();
+        if (sessionError) throw sessionError;
+        if (!sessionData.session) { show("login"); return; }
+        const { data: userData, error: userError } = await client.auth.getUser();
+        if (userError) throw userError;
+        const email = (userData.user && userData.user.email || "").toLowerCase();
+        if (!email) throw new Error("Googleアカウントのメールアドレスを確認できません。");
+        // 認証済みユーザー以外には、RLSがfamily_membersへのアクセスを許可しない。
+        const {data: membership,error: memberError} = await client.from("family_members")
+          .select("role").eq("email",email).maybeSingle();
+        if(memberError) throw memberError;
+        if(!membership) {
+          $("denied-email").textContent = email;
+          show("denied");
+          return;
+        }
+        $("user-email").textContent = email + (membership.role === "admin" ? " · 管理者" : " · 家族");
+        show("app");
+        const [dailyCount, cleaningCount, shoppingCount, future] = await Promise.all([
+          client.from("daily").select("day",{head:true,count:"exact"}),
+          client.from("cleaning").select("id",{head:true,count:"exact"}),
+          client.from("shopping").select("id",{head:true,count:"exact"}),
+          client.from("daily").select("day,kai,papa,mama,event,lunch")
+            .gte("day",japanToday()).order("day",{ascending:true}).limit(7)
+        ]);
+        for (const [id,response] of [
+          ["stat-daily",dailyCount],["stat-cleaning",cleaningCount],["stat-shopping",shoppingCount]
+        ]) {
+          if (response.error) throw response.error;
+          $(id).textContent = String(response.count == null ? "–" : response.count);
+        }
+        if (future.error) throw future.error;
+        displayDays(future.data || []);
+        if(window.location.search.includes("code=")){
+          window.history.replaceState({},document.title,window.location.pathname);
+        }
+      } catch (error) {
+        show("login");
+        $("login-error").textContent = "接続確認でエラーが発生しました: " + explain(error);
+        $("login-error").hidden = false;
+      }
+    }
+    start();
+  </script>
+</body>
+</html>
