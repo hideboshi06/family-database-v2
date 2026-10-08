@@ -1,243 +1,165 @@
 <!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#f4f7fa">
-  <meta name="description" content="Family Database v2 - 家族の予定と暮らしの情報をひとつに。">
-  <title>Family Database</title>
-  <style>
-    :root { color-scheme: light; --bg:#f4f7fa; --paper:#fff; --ink:#213449; --muted:#65758a; --line:#e2e8f0; --accent:#28659e; --soft:#eef5fb; --ok:#126d4b; --danger:#a03f32; }
-    * { box-sizing:border-box; }
-    html, body { margin:0; min-height:100%; }
-    body { font-family:-apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif; color:var(--ink); background:var(--bg); line-height:1.55; -webkit-font-smoothing:antialiased; }
-    body::before { content:""; position:fixed; inset:0 0 auto; height:240px; background:linear-gradient(180deg,#e7f1f9,rgba(231,241,249,0)); pointer-events:none; }
-    .page { position:relative; max-width:680px; margin:auto; padding:calc(26px + env(safe-area-inset-top)) 18px calc(36px + env(safe-area-inset-bottom)); }
-    .brand { display:flex; align-items:center; gap:12px; margin:8px 0 28px; }
-    .mark { display:grid; place-items:center; width:44px; height:44px; border-radius:15px; background:#dceaf8; font-size:24px; }
-    .brand h1 { margin:0; font-size:21px; letter-spacing:-.035em; line-height:1.2; }
-    .brand p { margin:3px 0 0; color:var(--muted); font-size:12px; }
-    .panel { background:var(--paper); border:1px solid var(--line); border-radius:19px; padding:24px; box-shadow:0 8px 25px rgba(31,58,86,.035); margin:16px 0; }
-    .panel h2 { margin:0 0 10px; font-size:19px; }
-    .lead { font-size:14px; color:var(--muted); margin:0 0 24px; }
-    .symbol { width:54px; height:54px; display:grid; place-items:center; font-size:27px; border-radius:16px; background:var(--soft); margin-bottom:18px; }
-    button { font:inherit; cursor:pointer; }
-    .primary { display:flex; align-items:center; justify-content:center; gap:12px; width:100%; min-height:52px; padding:13px 16px; background:var(--accent); color:#fff; border:0; border-radius:13px; font-weight:700; font-size:15px; }
-    .primary:disabled { opacity:.6; cursor:wait; }
-    .google { background:#fff; color:#24364b; border:1px solid #cbd5e1; box-shadow:0 2px 5px rgba(30,42,56,.06); }
-    .google-icon { color:#4285f4; font-size:20px; font-weight:800; font-family:Arial,sans-serif; }
-    .secondary { padding:10px 15px; background:#fff; border:1px solid var(--line); color:var(--accent); border-radius:11px; font-weight:600; }
-    .note { color:var(--muted); font-size:12px; margin:15px 0 0; }
-    .error { color:var(--danger); font-size:13px; margin-top:15px; white-space:pre-wrap; overflow-wrap:anywhere; }
-    .success { color:var(--ok); font-weight:700; font-size:14px; margin:0 0 7px; }
-    .topline { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:18px; }
-    .topline h2 { margin:0; font-size:20px; }
-    .account { font-size:12px; color:var(--muted); overflow-wrap:anywhere; margin:0 0 12px; }
-    .stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:9px; margin-top:16px; }
-    .stat { border-radius:12px; padding:13px 8px; text-align:center; background:var(--soft); }
-    .stat strong { display:block; font-size:26px; color:var(--accent); font-variant-numeric:tabular-nums; }
-    .stat span { display:block; font-size:11px; color:var(--muted); }
-    .day { border-top:1px solid var(--line); padding:11px 0; }
-    .day-date { font-size:13px; font-weight:700; color:var(--ink); margin-bottom:4px; }
-    .item { font-size:13px; margin:2px 0; white-space:pre-line; overflow-wrap:anywhere; }
-    .item b { color:var(--muted); font-size:11px; font-weight:600; margin-right:8px; }
-    .empty { font-size:13px; color:var(--muted); }
-    .footer { margin:24px 0 0; text-align:center; font-size:11px; color:#8592a1; }
-    [hidden] { display:none !important; }
-    @media (min-width:600px) { .page { padding-top:58px; } .panel { padding:30px; } }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f3f7fa">
+<meta name="description" content="Family Database v2 — 家族の予定・給食・掃除・買い物">
+<title>Family Database</title>
+<link rel="stylesheet" href="./styles.css">
 </head>
 <body>
-  <main class="page">
-    <header class="brand">
-      <div class="mark" aria-hidden="true">🏠</div>
-      <div><h1>Family Database</h1><p>家族の毎日を、ひとつに。<span aria-label="バージョン">v2</span></p></div>
-    </header>
+<div class="shell">
+  <header class="site-head">
+    <h1 class="brand"><span class="brand-icon">🏠</span> Family Database <span class="badge">v2</span></h1>
+    <span class="mini" id="user-label"></span>
+  </header>
 
-    <section id="loading" class="panel" role="status" aria-live="polite">
-      <h2>接続を確認しています…</h2>
-      <p class="lead" style="margin:0">少しだけお待ちください。</p>
-    </section>
+  <div id="loading" class="card login-wrap"><h2>データを確認しています…</h2><p class="small">もう少しお待ちください。</p></div>
 
-    <section id="login" class="panel" hidden>
-      <div class="symbol" aria-hidden="true">🔐</div>
-      <h2>家族専用ログイン</h2>
-      <p class="lead">登録されたGoogleアカウントでログインしてください。家族の予定や買い物データは、ログインした家族だけが見られます。</p>
-      <button class="primary google" id="login-button" type="button"><span class="google-icon" aria-hidden="true">G</span>Googleでログイン</button>
-      <p class="note">初回はGoogleのログイン画面に移動します。</p>
-      <p class="error" id="login-error" hidden role="alert"></p>
-    </section>
+  <div id="login" class="card login-wrap" hidden>
+    <span class="login-icon" aria-hidden="true">🔐</span>
+    <h2 class="login-title">家族専用ログイン</h2>
+    <p class="login-blurb">登録済みのGoogleアカウントだけが、家族の予定やお買い物を確認・編集できます。</p>
+    <button type="button" class="googlebtn" id="login-button" data-action="login">🌐 Googleでログイン</button>
+    <p class="small">Googleログイン後、このページに戻ります。</p>
+    <p class="status err" id="login-error" role="alert" hidden></p>
+  </div>
 
-    <section id="denied" class="panel" hidden>
-      <div class="symbol" aria-hidden="true">🔒</div>
-      <h2>アクセスが許可されていません</h2>
-      <p class="lead">Googleログインはできましたが、このアカウントは家族メンバーに登録されていません。</p>
-      <p class="account" id="denied-email"></p>
-      <button id="switch-account" type="button" class="primary">別のGoogleアカウントでログイン</button>
-      <p class="note">登録が必要な場合は管理者に連絡してください。</p>
-    </section>
+  <div id="denied" class="card login-wrap" hidden>
+    <span class="login-icon" aria-hidden="true">🔒</span>
+    <h2 class="login-title">家族として登録されていません</h2>
+    <p class="login-blurb">ログインはできましたが、Family Databaseのアクセス許可がありません。管理者に登録をお願いしてください。</p>
+    <p class="small" id="denied-email"></p>
+    <button class="btn full" data-action="switch" type="button">別のGoogleアカウントでログイン</button>
+  </div>
 
-    <section id="app" hidden>
-      <section class="panel">
-        <div class="topline">
-          <h2>接続できました！</h2>
-          <button class="secondary" id="logout-button" type="button">ログアウト</button>
+  <div id="main" hidden>
+    <div id="page-dashboard" class="page active">
+      <div class="weather-head">
+        <button id="today-date" class="date-ref" data-action="refresh" type="button" title="タップして最新データを読み込む">読み込み中</button>
+        <div id="weather-summary" class="weather-summary"></div>
+      </div>
+      <div class="dashgrid">
+        <div>
+          <section class="card">
+            <div class="between"><h2>予定</h2><button type="button" class="btn ghost smallbtn" data-tab="month">月間編集 ›</button></div>
+            <div id="schedule-list"></div>
+          </section>
         </div>
-        <p class="success">✓ 家族専用データベースに接続中</p>
-        <p class="account" id="user-email"></p>
-        <p class="lead" style="margin-bottom:7px">Supabaseから取得した件数を表示しています。</p>
-        <div class="stats" aria-label="データ件数">
-          <div class="stat"><strong id="stat-daily">–</strong><span>日次</span></div>
-          <div class="stat"><strong id="stat-cleaning">–</strong><span>掃除</span></div>
-          <div class="stat"><strong id="stat-shopping">–</strong><span>買い物</span></div>
+        <div>
+          <section class="card">
+            <div class="between"><h2>給食</h2><button class="btn ghost smallbtn" data-tab="month" type="button">献立編集 ›</button></div>
+            <div id="today-lunch"></div>
+          </section>
+          <section class="card">
+            <div class="between"><h2>掃除・ゴミ</h2><button class="btn ghost smallbtn" data-tab="cleaning" type="button">掃除一覧 ›</button></div>
+            <div class="small" style="margin:5px 0 7px;font-weight:700">今日のゴミ</div>
+            <div id="today-garbage"></div>
+            <div class="small" style="margin:13px 0 4px;font-weight:700">掃除の期限</div>
+            <div id="cleaning-due"></div>
+          </section>
+          <section class="card">
+            <div class="between">
+              <h2>買い物 <span id="shopping-count" class="small"></span></h2>
+              <div class="section-actions">
+                <button class="btn secondary smallbtn" type="button" data-action="add-shopping">＋ 買い物</button>
+                <button class="btn ghost smallbtn" type="button" data-tab="shopping">一覧 ›</button>
+              </div>
+            </div>
+            <div id="shopping-needed"></div>
+          </section>
         </div>
-        <p class="error" id="data-error" role="alert" hidden></p>
+      </div>
+      <p class="tiny">※天気はスプレッドシートから移行した時点のデータです。自動更新はまだ切り替えていません。</p>
+    </div>
+
+    <div id="page-month" class="page">
+      <section class="card">
+        <div class="month-header">
+          <button class="btn secondary smallbtn" type="button" data-action="prev">‹ 前月</button>
+          <span class="month-title" id="month-title"></span>
+          <button class="btn secondary smallbtn" type="button" data-action="next">翌月 ›</button>
+        </div>
+        <div class="between" style="margin-bottom:12px">
+          <div class="choice">
+            <button id="mode-schedule" type="button" data-action="mode" data-mode="schedule" class="active">家族の予定</button>
+            <button id="mode-lunch" type="button" data-action="mode" data-mode="lunch">給食献立</button>
+          </div>
+          <div class="inline">
+            <button type="button" class="btn ghost smallbtn" data-action="expand-all">全部開く</button>
+            <button type="button" class="btn ghost smallbtn" data-action="collapse-all">閉じる</button>
+          </div>
+        </div>
+        <p class="small">日付をタップして入力。登録済みならそのまま訂正し、最後にまとめて保存できます。</p>
+        <div class="month-list" id="month-days"></div>
+        <div class="savebar">
+          <span class="small" id="save-count">0日分の変更</span>
+          <button type="button" class="btn" data-action="save-month" id="save-month" disabled>まとめて保存</button>
+        </div>
       </section>
-      <section class="panel">
-        <h2>これからの予定</h2>
-        <p class="note" style="margin-top:0;margin-bottom:13px">スプレッドシートから移行したデータを表示</p>
-        <div id="days"><p class="empty">読み込み中…</p></div>
+    </div>
+
+    <div id="page-cleaning" class="page">
+      <section class="card">
+        <div class="between"><h2>掃除一覧</h2><span class="badge">完了で次回を自動計算</span></div>
+        <div id="cleaning-items"></div>
       </section>
-      <p class="note">まずはGoogleログインとデータ参照の動作確認版。予定・給食の月間編集、掃除・買い物の操作画面はこれから追加します。</p>
-    </section>
+    </div>
 
-    <footer class="footer">Family Database v2 · GitHub Pages + Supabase</footer>
-  </main>
+    <div id="page-shopping" class="page">
+      <section class="card">
+        <div class="between"><h2>買い物一覧</h2><button class="btn smallbtn" type="button" data-action="add-shopping">＋ 商品追加</button></div>
+        <label class="field" for="shopping-filter">表示</label>
+        <select class="input select" id="shopping-filter">
+          <option value="all">全商品</option>
+          <option value="needed">必要なもの</option>
+          <option value="quick">クイック表示</option>
+        </select>
+        <div id="shopping-items" style="margin-top:12px"></div>
+      </section>
+    </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script>
-    "use strict";
-    const SUPABASE_URL = "https://besevrrmhwmkdqmoiscf.supabase.co";
-    const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_oo7Bdb8Ip-icb6Y0nqovKg_OH9Taql2";
-    const $ = (id) => document.getElementById(id);
-    const views = ["loading", "login", "denied", "app"];
-    function show(name) { views.forEach(id => { $(id).hidden = id !== name; }); }
-    function explain(error) { return error && error.message ? error.message : String(error || "不明なエラー"); }
-    function japanToday() {
-      const parts = new Intl.DateTimeFormat("en-US", {
-        timeZone:"Asia/Tokyo", year:"numeric", month:"2-digit", day:"2-digit"
-      }).formatToParts(new Date());
-      const pick = name => parts.find(part => part.type === name).value;
-      return pick("year") + "-" + pick("month") + "-" + pick("day");
-    }
-    function addText(parent, tag, text, className) {
-      const node = document.createElement(tag);
-      if (className) node.className = className;
-      node.textContent = text;
-      parent.appendChild(node);
-      return node;
-    }
-    function displayDays(rows) {
-      const root = $("days");
-      root.replaceChildren();
-      if (!rows.length) { addText(root, "p", "今後の登録済み予定はありません。", "empty"); return; }
-      for (const day of rows) {
-        const box = addText(root, "div", "", "day");
-        const label = new Date(day.day + "T12:00:00+09:00").toLocaleDateString("ja-JP",{
-          timeZone:"Asia/Tokyo", month:"numeric", day:"numeric", weekday:"short"
-        });
-        addText(box, "div", label, "day-date");
-        let any = false;
-        for (const [key, title] of [["kai","カイ"],["papa","パパ"],["mama","ママ"],["event","イベント"],["lunch","給食"]]) {
-          if (!day[key]) continue;
-          const line = document.createElement("div");
-          line.className = "item";
-          addText(line, "b", title);
-          addText(line, "span", day[key]);
-          box.appendChild(line);
-          any = true;
-        }
-        if (!any) addText(box, "div", "登録なし", "empty");
-      }
-    }
+    <div id="page-settings" class="page">
+      <section class="card">
+        <div class="between"><h2>設定</h2><button type="button" class="btn secondary smallbtn" data-action="logout">ログアウト</button></div>
+        <div class="small">ログイン中</div>
+        <p id="settings-user" style="overflow-wrap:anywhere"></p>
+        <p class="notice">閲覧・編集権限はGoogleログインとSupabaseのアクセス制限（RLS）で管理しています。</p>
+      </section>
+      <section class="card" id="settings-admin" hidden>
+        <h2>家族アカウント管理</h2>
+        <p class="small">登録したGoogleアカウントだけが、予定・給食・掃除・買い物を閲覧・編集できます。</p>
+        <div id="member-list"></div>
+        <form id="member-form">
+          <label class="field" for="member-email">家族のGoogleメールアドレス</label>
+          <input type="email" id="member-email" name="email" class="input" placeholder="example@gmail.com" autocomplete="off" required>
+          <button type="submit" class="btn full" style="margin-top:10px">家族を追加</button>
+        </form>
+      </section>
+    </div>
+    <p class="status" id="page-status" role="status" aria-live="polite"></p>
+    <nav class="tabbar" aria-label="メインメニュー">
+      <button type="button" data-tab="dashboard" class="active"><span class="ico">🏠</span>今日</button>
+      <button type="button" data-tab="month"><span class="ico">📅</span>月間編集</button>
+      <button type="button" data-tab="cleaning"><span class="ico">🧹</span>掃除</button>
+      <button type="button" data-tab="shopping"><span class="ico">🛒</span>買い物</button>
+      <button type="button" data-tab="settings"><span class="ico">⚙️</span>設定</button>
+    </nav>
+  </div>
+</div>
 
-    async function start() {
-      show("loading");
-      if (!window.supabase || !window.supabase.createClient) {
-        show("login");
-        $("login-error").hidden = false;
-        $("login-error").textContent = "ログイン用ライブラリを読み込めませんでした。ネットワーク接続を確認して再読み込みしてください。";
-        $("login-button").disabled = true;
-        return;
-      }
-      const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-        auth: { flowType:"pkce", autoRefreshToken:true, persistSession:true, detectSessionInUrl:true }
-      });
-      async function login() {
-        $("login-error").hidden = true;
-        $("login-button").disabled = true;
-        const { error } = await client.auth.signInWithOAuth({
-          provider:"google",
-          options:{
-            redirectTo: window.location.origin + window.location.pathname,
-            queryParams:{ prompt:"select_account" }
-          }
-        });
-        if (error) {
-          $("login-button").disabled = false;
-          $("login-error").textContent = "ログインを開始できませんでした: " + explain(error);
-          $("login-error").hidden = false;
-        }
-      }
-      async function logout() {
-        await client.auth.signOut();
-        $("login-button").disabled = false;
-        show("login");
-      }
-      $("login-button").addEventListener("click", login);
-      $("logout-button").addEventListener("click", logout);
-      $("switch-account").addEventListener("click", logout);
-      const params = new URLSearchParams(window.location.search);
-      if (params.has("error")) {
-        show("login");
-        $("login-error").textContent = params.get("error_description") || params.get("error");
-        $("login-error").hidden = false;
-        return;
-      }
-      try {
-        const { data: sessionData, error: sessionError } = await client.auth.getSession();
-        if (sessionError) throw sessionError;
-        if (!sessionData.session) { show("login"); return; }
-        const { data: userData, error: userError } = await client.auth.getUser();
-        if (userError) throw userError;
-        const email = (userData.user && userData.user.email || "").toLowerCase();
-        if (!email) throw new Error("Googleアカウントのメールアドレスを確認できません。");
-        // 認証済みユーザー以外には、RLSがfamily_membersへのアクセスを許可しない。
-        const {data: membership,error: memberError} = await client.from("family_members")
-          .select("role").eq("email",email).maybeSingle();
-        if(memberError) throw memberError;
-        if(!membership) {
-          $("denied-email").textContent = email;
-          show("denied");
-          return;
-        }
-        $("user-email").textContent = email + (membership.role === "admin" ? " · 管理者" : " · 家族");
-        show("app");
-        const [dailyCount, cleaningCount, shoppingCount, future] = await Promise.all([
-          client.from("daily").select("day",{head:true,count:"exact"}),
-          client.from("cleaning").select("id",{head:true,count:"exact"}),
-          client.from("shopping").select("id",{head:true,count:"exact"}),
-          client.from("daily").select("day,kai,papa,mama,event,lunch")
-            .gte("day",japanToday()).order("day",{ascending:true}).limit(7)
-        ]);
-        for (const [id,response] of [
-          ["stat-daily",dailyCount],["stat-cleaning",cleaningCount],["stat-shopping",shoppingCount]
-        ]) {
-          if (response.error) throw response.error;
-          $(id).textContent = String(response.count == null ? "–" : response.count);
-        }
-        if (future.error) throw future.error;
-        displayDays(future.data || []);
-        if(window.location.search.includes("code=")){
-          window.history.replaceState({},document.title,window.location.pathname);
-        }
-      } catch (error) {
-        show("login");
-        $("login-error").textContent = "接続確認でエラーが発生しました: " + explain(error);
-        $("login-error").hidden = false;
-      }
-    }
-    start();
-  </script>
+<div id="modal" class="overlay" hidden>
+  <div class="sheetmodal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <h2 id="modal-title"></h2>
+    <div id="modal-content"></div>
+    <div id="modal-actions" class="modal-actions"></div>
+  </div>
+</div>
+<div id="toast" role="status" class="toast" hidden></div>
+
+<script>window.FD_CONFIG = {url:"https://besevrrmhwmkdqmoiscf.supabase.co",key:"sb_publishable_oo7Bdb8Ip-icb6Y0nqovKg_OH9Taql2"};</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="./app.js" defer></script>
 </body>
 </html>
