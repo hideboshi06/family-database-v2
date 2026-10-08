@@ -31,9 +31,14 @@ Deno.serve(async(req:Request):Promise<Response>=>{
   const token=Deno.env.get("WEATHER_CRON_TOKEN")||"";
   const key=Deno.env.get("WEATHERAPI_KEY")||"";
   const coords=Deno.env.get("WEATHER_COORDS")||"";
-  if(token.length<32||!key||!coords)return json(503,{error:"not_configured"});
+  if(token.length<32)return json(503,{error:"cron_token_not_configured"});
   if(!(await equalToken(req.headers.get("x-weather-cron-token")||"",token)))
     return json(401,{error:"unauthorized"});
+  // Only reveal missing secret names to a caller holding the cron token, never their values.
+  const missing=[];
+  if(!key)missing.push("WEATHERAPI_KEY");
+  if(!coords)missing.push("WEATHER_COORDS");
+  if(missing.length)return json(503,{error:"not_configured",missing});
   const supabaseUrl=Deno.env.get("SUPABASE_URL");
   let secretKey=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if(!secretKey) {
