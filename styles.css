@@ -171,3 +171,33 @@ details.help summary{color:var(--navy);cursor:pointer;font-size:12px}
 @media (min-width:690px){
   .today-body .highlights-grid{gap:18px}
 }
+
+/* Single, quiet calendar sheet. Dates are the only headings; subtle dividers show each day. */
+.agenda-board{padding:0 14px;border-color:var(--line);overflow:hidden;background:var(--paper)}
+.agenda-date-section{padding:14px 0}
+.agenda-date-section+.agenda-date-section,.agenda-upcoming{border-top:1px solid var(--line)}
+.agenda-day-top{display:flex;flex-direction:column;align-items:flex-start;gap:5px}
+.agenda-date{border:0;background:none;color:var(--ink);font-size:17px;font-weight:800;padding:0;text-align:left;min-height:30px;letter-spacing:-.01em}
+.agenda-date:active,.agenda-upcoming .daydate:active{opacity:.65}
+.agenda-weather{min-width:0;color:var(--ink);font-size:13px;line-height:1.5}
+.agenda-weather .weather-summary{font-size:13px}
+.agenda-day-details{display:grid;gap:8px;margin-top:10px}
+.agenda-info{display:grid;grid-template-columns:43px minmax(0,1fr);align-items:start;gap:8px;min-width:0}
+.agenda-key{padding-top:1px;color:var(--sub);font-size:12px;font-weight:750}
+.agenda-value{min-width:0;font-size:13px;line-height:1.55;overflow-wrap:anywhere}
+.agenda-value .scheduleline{margin:0 0 3px}
+.agenda-value .empty{font-size:12px;padding:1px 0}
+.agenda-value .dayrow-inline{padding:0}
+.agenda-weather.tomorrow-weather{display:flex;align-items:center;flex-wrap:wrap;gap:0 5px}
+.agenda-upcoming:empty{display:none}
+.agenda-upcoming .dayrow{display:block;border-top:1px solid var(--line);padding:12px 0}
+.agenda-upcoming .dayrow:first-child{border-top:0}
+.agenda-upcoming .daydate{font-size:15px;min-height:30px;padding:0 0 4px;color:var(--ink)}
+.agenda-upcoming .daydate.sat{color:var(--blue)}
+.agenda-upcoming .daydate.sun{color:var(--red)}
+.agenda-upcoming .daycontent{padding:2px 0}
+.agenda-upcoming .scheduleline{margin-bottom:4px}
+@media (min-width:690px){
+  .agenda-board{padding:0 20px}
+  .agenda-date-section{padding:16px 0}
+}
