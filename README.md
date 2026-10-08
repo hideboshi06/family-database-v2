@@ -24,7 +24,7 @@
 - 旧GAS + Google Sheets版は稼働継続中。**自動同期はありません**。
 - 2026-10-08にGoogle Sheetsから初回データをコピー。移行時は日次61件、掃除4件、買い物15件。
 - 旧Sheetの買い物ID `14` が重複していたため「キュウイ」をSupabase側のみ `15` に変更。
-- **WeatherAPIを使う天気自動更新とiPhone通知はまだ移行していません**。天気は移行時点の値です。
+- **天気の自動更新処理・Cronは作成済み**ですが、WeatherAPIキーと共有トークンの登録待ち。登録前は天気が更新されません。iPhone通知は旧GAS版を使用中です。設定方法は [WEATHER_SETUP.md](WEATHER_SETUP.md) に記載しています。
 - GitHub PagesのHTML、CSS、JavaScriptは公開されるため、Supabaseの `service_role` キーやWeatherAPIの秘密鍵などを置かないでください。クライアント側にはpublishable keyのみを配置しています。
 
 ## 動作確認
@@ -36,6 +36,6 @@
 
 ## 次に移行する機能
 
-1. WeatherAPIの自動更新（Supabase Edge Functionsなど、秘密鍵を守れるサーバー側）。
+1. 天気更新用秘密キーをSupabase Edge Functions/Vaultへ登録し、更新動作を確認する。
 2. iPhoneショートカット通知のSupabase対応。
 3. 本番切り替え前にスプシ側との差分移行、動作確認、切り替え。
