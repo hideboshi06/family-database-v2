@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#f3f7fa">
 <meta name="description" content="Family Database v2 — 家族の予定・給食・掃除・買い物">
 <title>Family Database</title>
-<link rel="stylesheet" href="./styles.css?v=20261009-six-rows">
+<link rel="stylesheet" href="./styles.css?v=20261009-aligned-agenda">
 </head>
 <body>
 <!-- Compatibility for older cached app.js versions; never shown to the user. -->
@@ -43,9 +43,8 @@
           <div id="weather-summary" class="daily-weather"></div>
         </div>
         <div class="daily-body">
-          <div class="daily-info" id="today-agenda-block">
-            <span class="daily-key">予定</span>
-            <div id="today-schedule" class="daily-value"></div>
+          <div id="today-agenda-block" class="daily-agenda-rows">
+            <div id="today-schedule" class="daily-agenda-lines"></div>
           </div>
           <div class="daily-info" id="today-lunch-block" hidden>
             <span class="daily-key">給食</span>
@@ -82,9 +81,8 @@
           <div id="tomorrow-weather" class="daily-weather tomorrow-weather"></div>
         </div>
         <div class="daily-body">
-          <div class="daily-info" id="tomorrow-agenda-block">
-            <span class="daily-key">予定</span>
-            <div id="tomorrow-schedule" class="daily-value"></div>
+          <div id="tomorrow-agenda-block" class="daily-agenda-rows">
+            <div id="tomorrow-schedule" class="daily-agenda-lines"></div>
           </div>
           <div class="daily-info" id="tomorrow-lunch-block" hidden>
             <span class="daily-key">給食</span>
@@ -206,6 +204,6 @@
 
 <script>window.FD_CONFIG = {url:"https://besevrrmhwmkdqmoiscf.supabase.co",key:"sb_publishable_oo7Bdb8Ip-icb6Y0nqovKg_OH9Taql2"};</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="./app.js?v=20261009-plans-only" defer></script>
+<script src="./app.js?v=20261009-aligned-agenda" defer></script>
 </body>
 </html>
