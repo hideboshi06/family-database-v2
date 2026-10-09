@@ -272,3 +272,27 @@ details.help summary{color:var(--navy);cursor:pointer;font-size:12px}
 }
 .tabbar button{flex:1;width:auto;max-width:165px}
 @media(max-width:400px){.tabbar button{font-size:10.5px}}
+
+/* Schedule UI: readable text, black weekdays, blue Saturday, red Sundays/holidays. */
+.section-page-title .schedule-refresh{border:0;background:transparent;color:inherit;font:inherit;font-weight:inherit;letter-spacing:inherit;padding:0;display:inline-flex;align-items:center;gap:8px;min-height:33px}
+.section-page-title .schedule-refresh:active{opacity:.6}
+.refresh-glyph{font-size:16px;font-weight:500;color:var(--sub)}
+.date-title-row{display:flex;align-items:baseline;flex-wrap:wrap;gap:7px}
+.daily-header .daily-date{color:var(--ink)}
+.daily-header .daily-date.sat{color:var(--blue)}
+.daily-header .daily-date.sun{color:var(--red)}
+.monthtop .monthdate{color:var(--ink)}
+.monthtop .monthdate.sat{color:var(--blue)}
+.monthtop .monthdate.sun{color:var(--red)}
+.future-card .daydate.sun{color:var(--red)}
+.holiday-name{font-size:11px;font-weight:650;color:var(--red);letter-spacing:0}
+.month-holiday{display:inline-block;margin-left:6px;font-size:10px;vertical-align:1px}
+.future-card .holiday-name{display:inline-block;margin-left:5px;vertical-align:1px}
+.daily-value,.future-card .daycontent{font-size:14px;line-height:1.6}
+.daily-value .schedule-text,.future-card .schedule-text{font-size:14px;line-height:1.6}
+.daily-value .who,.future-card .who{font-size:12px}
+.daily-body{gap:9px}
+.daily-key{padding-top:3px}
+.daily-value .task-line{display:block;white-space:pre-line;overflow-wrap:anywhere}
+.daily-value .task-line+.task-line{margin-top:4px}
+.daily-value .dayrow-inline .empty{font-size:14px;color:var(--sub);padding:0}
