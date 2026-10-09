@@ -38,10 +38,14 @@
     $("modal-title").textContent=title;
     $("modal-content").innerHTML=content;
     $("modal-actions").innerHTML=footer;
+    $("modal-save-status").hidden=true;
+    $("modal-save-status").textContent="";
     $("modal").hidden=false;
   }
   function closeModal(){$("modal").hidden=true;$("modal-content").innerHTML="";}
-  function actions(){return '<button class="btn secondary" type="button" data-action="close">キャンセル</button><button class="btn" type="submit" form="modal-form">保存</button>';}
+  // Use a real click handler instead of a form-associated button outside the form:
+  // iOS Safari standalone/webview may not dispatch submit for that layout.
+  function actions(){return '<button class="btn secondary" type="button" data-action="close">キャンセル</button><button class="btn" type="button" data-action="save-modal">保存</button>';}
   function navigate(page){
     state.tab=page;
     document.querySelectorAll(".page").forEach(el=>el.classList.toggle("active",el.id==="page-"+page));
@@ -280,7 +284,7 @@
       '</form>';
     const footer='<button class="btn secondary" type="button" data-action="close">キャンセル</button>'+
       (id?'<button class="btn danger" type="button" data-action="delete-task" data-id="'+esc(id)+'">削除</button>':"")+
-      '<button class="btn" type="submit" form="modal-form">保存</button>';
+      '<button class="btn" type="button" data-action="save-modal">保存</button>';
     modal(id?"やることを編集":"やることを追加",html,footer);
   }
   function monthValue(day,k){
@@ -407,7 +411,13 @@
   }
   async function submitModal(form){
     const fd=new FormData(form),kind=form.dataset.kind;
-    const b=$("modal-actions").querySelector('button[type="submit"]');b.disabled=true;
+    const b=$("modal-actions").querySelector('[data-action="save-modal"]');
+    if(!b)throw Error("保存ボタンが見つかりません");
+    b.disabled=true;
+    b.textContent="保存中…";
+    const status=$("modal-save-status");
+    status.hidden=false;status.textContent="保存しています…";status.classList.remove("err");
+    let savedTaskId=null;
     try{
       if(kind==="day"){
         const data={};fields.forEach(k=>data[k]=String(fd.get(k)||"").trim()||null);
@@ -418,8 +428,12 @@
         const props={title:String(fd.get("title")||"").trim(),assignee:String(fd.get("assignee")||"")||null,due_on:String(fd.get("due_on")||"")||null,updated_at:new Date().toISOString()};
         if(!props.title||props.title.length>200)throw Error("やること名を入力してください（200文字まで）");
         if(props.assignee&&!["パパ","ママ","カイ"].includes(props.assignee))throw Error("担当者を確認してください");
-        if(id)check(await state.client.from("tasks").update(props).eq("id",id));
-        else check(await state.client.from("tasks").insert(props));
+        const result=id
+          ?await state.client.from("tasks").update(props).eq("id",id).select("id").single()
+          :await state.client.from("tasks").insert(props).select("id").single();
+        const saved=check(result);
+        if(!saved?.id)throw Error("タスクの保存結果を確認できませんでした");
+        savedTaskId=saved.id;
       }else if(kind==="shopping"){
         const id=String(fd.get("id")||"");
         const props={product:String(fd.get("product")||"").trim(),quantity:String(fd.get("quantity")||"").trim()||null,category:String(fd.get("category")||"").trim()||null,store:String(fd.get("store")||"").trim()||null,note:String(fd.get("note")||"").trim()||null,updated_at:new Date().toISOString()};
@@ -428,8 +442,15 @@
         if(existing)check(await state.client.from("shopping").update(props).eq("id",id));
         else check(await state.client.from("shopping").insert({...props,id:"item-"+(crypto.randomUUID?.()||String(Date.now())+Math.random().toString(36).slice(2)),needed:true,quick_display:true,sort_order:Math.max(0,...state.shopping.map(x=>Number(x.sort_order)||0))+1}));
       }
-      closeModal();await refresh();toast("保存したよ！");
-    }catch(e){b.disabled=false;report(e,"保存: ");}
+      await refresh();
+      if(savedTaskId&&!state.tasks.some(t=>t.id===savedTaskId))
+        throw Error("保存できましたが一覧へ反映されません。ページを更新してください");
+      closeModal();toast("保存したよ！");
+    }catch(e){
+      b.disabled=false;b.textContent="保存";
+      status.textContent="保存できませんでした: "+errorText(e);status.hidden=false;status.classList.add("err");
+      report(e,"保存: ");
+    }
   }
   async function click(e){
     const el=e.target.closest("[data-action],[data-tab]");if(!el)return;
@@ -440,6 +461,12 @@
       if(a==="logout"||a==="switch")await signOut();
       if(a==="reload"){location.reload();return;}
       if(a==="refresh"){await refresh();toast("更新したよ！");}
+      if(a==="save-modal"){
+        const form=$("modal-form");
+        if(!form)throw Error("入力画面が見つかりません");
+        if(typeof form.reportValidity==="function"&&!form.reportValidity())return;
+        await submitModal(form);
+      }
       if(a==="edit-day")await editDay(el.dataset.day);
       if(a==="close")closeModal();
       if(a==="expand-day"){const d=el.dataset.day;state.opened.has(d)?state.opened.delete(d):state.opened.add(d);renderMonth();}
