@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#f3f7fa">
 <meta name="description" content="Family Database v2 — 家族の予定・給食・掃除・買い物">
 <title>Family Database</title>
-<link rel="stylesheet" href="./styles.css?v=20261009-uifinal1">
+<link rel="stylesheet" href="./styles.css?v=20261009-todohub">
 </head>
 <body>
 <!-- Compatibility for older cached app.js versions; never shown to the user. -->
@@ -33,7 +33,7 @@
 
   <div id="main" hidden>
     <div id="page-dashboard" class="page active">
-      <h1 class="section-page-title"><button type="button" class="schedule-refresh" data-action="reload" title="タップしてページを更新" aria-label="スケジュールを再読み込み">スケジュール <span class="refresh-glyph" aria-hidden="true">↻</span></button></h1>
+      <h1 class="section-page-title"><button type="button" class="schedule-refresh" data-action="reload" title="タップしてページを更新" aria-label="スケジュールを再読み込み">スケジュール</button></h1>
       <section class="card daily-card today-card" aria-label="今日">
         <div class="daily-header">
           <div class="date-title-row">
@@ -125,23 +125,32 @@
       </section>
     </div>
 
-    <div id="page-cleaning" class="page">
-      <section class="card">
-        <div class="between"><h2>掃除一覧</h2><span class="badge">完了で次回を自動計算</span></div>
-        <div id="cleaning-items"></div>
+    <div id="page-todo" class="page">
+      <h1 class="section-page-title">やること</h1>
+      <section class="card todo-card">
+        <div class="between">
+          <h2>やること <span id="todo-count" class="small"></span></h2>
+          <button type="button" class="btn smallbtn" data-action="add-task">＋ タスク</button>
+        </div>
+        <div id="todo-items" class="todo-items"></div>
+        <button type="button" class="btn ghost smallbtn completed-toggle" id="todo-show-completed" data-action="toggle-completed" hidden></button>
+        <div id="todo-completed-list" class="completed-list" hidden></div>
       </section>
-    </div>
-
-    <div id="page-shopping" class="page">
-      <section class="card">
-        <div class="between"><h2>買い物一覧</h2><button class="btn smallbtn" type="button" data-action="add-shopping">＋ 商品追加</button></div>
-        <label class="field" for="shopping-filter">表示</label>
-        <select class="input select" id="shopping-filter">
-          <option value="all">全商品</option>
-          <option value="needed">必要なもの</option>
-          <option value="quick">クイック表示</option>
-        </select>
-        <div id="shopping-items" style="margin-top:12px"></div>
+      <section class="card todo-shopping-card">
+        <div class="between">
+          <h2>買い物</h2>
+          <button class="btn secondary smallbtn" type="button" data-action="add-shopping">＋ 商品</button>
+        </div>
+        <div id="shopping-categories" class="category-pills" aria-label="買い物カテゴリ"></div>
+        <div id="shopping-items"></div>
+        <select id="shopping-filter" hidden aria-hidden="true"><option value="all">全商品</option></select>
+      </section>
+      <section class="card todo-cleaning-card">
+        <div class="between">
+          <h2>掃除</h2>
+          <span class="tiny">完了で次回期限を更新</span>
+        </div>
+        <div id="cleaning-items"></div>
       </section>
     </div>
 
@@ -166,8 +175,7 @@
     <p class="status" id="page-status" role="status" aria-live="polite"></p>
     <nav class="tabbar" aria-label="メインメニュー">
       <button type="button" data-tab="dashboard" class="active"><span class="ico">📅</span>スケジュール</button>
-      <button type="button" data-tab="cleaning"><span class="ico">🧹</span>掃除</button>
-      <button type="button" data-tab="shopping"><span class="ico">🛒</span>買い物</button>
+      <button type="button" data-tab="todo"><span class="ico">☑️</span>やること</button>
       <button type="button" data-tab="settings"><span class="ico">⚙️</span>設定</button>
     </nav>
   </div>
@@ -184,6 +192,6 @@
 
 <script>window.FD_CONFIG = {url:"https://besevrrmhwmkdqmoiscf.supabase.co",key:"sb_publishable_oo7Bdb8Ip-icb6Y0nqovKg_OH9Taql2"};</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="./app.js?v=20261009-uifinal1" defer></script>
+<script src="./app.js?v=20261009-todohub" defer></script>
 </body>
 </html>
