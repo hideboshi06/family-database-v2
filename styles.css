@@ -249,15 +249,26 @@ details.help summary{color:var(--navy);cursor:pointer;font-size:12px}
   .future-card{padding:5px 20px}
 }
 
-/* iPad Safari OAuth: second, direct user-tap link avoids async navigation limitations. */
-.oauth-link{
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  text-align:center;
-  text-decoration:none;
+
+/* Schedule-first navigation: monthly editor belongs to the schedule page. */
+.section-page-title{
+  font-size:19px;
+  font-weight:800;
+  letter-spacing:-.015em;
   color:var(--ink);
-  padding:10px 16px;
-  margin-top:10px;
+  margin:3px 2px 13px;
 }
-.oauth-tip{margin-top:12px!important;line-height:1.65}
+.schedule-month-link{
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  width:100%;min-height:47px;margin:7px 0 16px;
+  border:1px solid #cbdde9;border-radius:13px;background:#fff;
+  color:var(--navy);font-size:14px;font-weight:750;
+  box-shadow:var(--shadow)
+}
+.month-back-link{
+  display:inline-flex;align-items:center;min-height:40px;
+  margin:0 0 9px;padding:5px 2px;background:none;border:0;
+  color:var(--navy);font-size:13px;font-weight:700
+}
+.tabbar button{flex:1;width:auto;max-width:165px}
+@media(max-width:400px){.tabbar button{font-size:10.5px}}
