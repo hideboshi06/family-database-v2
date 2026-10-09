@@ -40,7 +40,7 @@
   function navigate(page){
     state.tab=page;
     document.querySelectorAll(".page").forEach(el=>el.classList.toggle("active",el.id==="page-"+page));
-    document.querySelectorAll("[data-tab]").forEach(el=>el.classList.toggle("active",el.dataset.tab===page));
+    document.querySelectorAll(".tabbar [data-tab]").forEach(el=>el.classList.toggle("active",el.dataset.tab===(page==="month"?"dashboard":page)));
     if(page==="month"){renderMonth();loadMonth().catch(e=>report(e,"月間読込: "));}
     if(page==="shopping")renderShopping();
     if(page==="cleaning")renderCleaning();
@@ -77,40 +77,19 @@
       show("login");$("login-error").textContent="ログイン確認: "+errorText(e);$("login-error").hidden=false;
     }
   }
-  function isIPad(){
-    return /iPad/i.test(navigator.userAgent) ||
-      (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1);
-  }
   async function signIn(){
-    const button=$("login-button"),link=$("oauth-continue"),help=$("login-flow-help");
-    button.disabled=true;$("login-error").hidden=true;link.hidden=true;
-    help.textContent="Googleのログイン画面を準備しています…";
+    const button=$("login-button");
+    button.disabled=true;
+    $("login-error").hidden=true;
     try{
-      const tablet=isIPad();
-      const options={redirectTo:location.origin+location.pathname,skipBrowserRedirect:true};
-      // The forced account chooser can be unstable in older iPad webviews.
-      if(!tablet)options.queryParams={prompt:"select_account"};
-      const {data,error}=await state.client.auth.signInWithOAuth({provider:"google",options});
+      const {error}=await state.client.auth.signInWithOAuth({
+        provider:"google",
+        options:{redirectTo:location.origin+location.pathname,queryParams:{prompt:"select_account"}}
+      });
       if(error)throw error;
-      if(!data?.url)throw Error("GoogleログインのURLを取得できませんでした");
-      // The OAuth destination must be our own Supabase Auth endpoint.
-      const target=new URL(data.url),expected=new URL(cfg.url);
-      if(target.origin!==expected.origin||target.pathname!=="/auth/v1/authorize")
-        throw Error("ログイン先を検証できませんでした");
-      link.href=target.href;
-      link.hidden=false;
-      if(tablet){
-        button.hidden=true;
-        help.textContent="下のリンクを押してGoogleログインへ進んでください。";
-        $("oauth-ipad-tip").hidden=false;
-      }else{
-        // Keep the normal one-tap experience on browsers where it works.
-        location.assign(target.href);
-      }
-    }catch(error){
-      button.hidden=false;button.disabled=false;
-      help.textContent="Googleログイン後、このページに戻ります。";
-      $("login-error").textContent="ログイン開始: "+errorText(error);
+    }catch(e){
+      button.disabled=false;
+      $("login-error").textContent="Googleログイン: "+errorText(e);
       $("login-error").hidden=false;
     }
   }
