@@ -137,11 +137,14 @@
         <div id="todo-completed-list" class="completed-list" hidden></div>
       </section>
       <section class="card todo-shopping-card">
-        <div class="between">
+        <div class="shopping-head">
           <h2>買い物</h2>
+          <div id="shopping-categories" class="category-pills" aria-label="買い物カテゴリ"></div>
+        </div>
+        <div class="shopping-tools">
+          <span class="tiny">チェック＝買うもの</span>
           <button class="btn secondary smallbtn" type="button" data-action="add-shopping">＋ 商品</button>
         </div>
-        <div id="shopping-categories" class="category-pills" aria-label="買い物カテゴリ"></div>
         <div id="shopping-items"></div>
         <select id="shopping-filter" hidden aria-hidden="true"><option value="all">全商品</option></select>
       </section>
