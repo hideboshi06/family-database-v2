@@ -182,6 +182,27 @@
       .map(t=>String(t.title||"").trim()+(t.assignee?"("+t.assignee+")":"")).filter(Boolean);
     return trash.concat(cleaning,tasks);
   }
+  function garbageScheduleLines(value){
+    return String(value||"").split(/\r?\n/u).map(x=>x.trim()).filter(Boolean);
+  }
+  function dueCleaningToday(today){
+    return state.cleaning
+      .filter(c=>!c.next_due||c.next_due<=today)
+      .map(c=>cleaningScheduleName(c.name)).filter(Boolean);
+  }
+  function dueTasksToday(today){
+    return state.tasks
+      .filter(t=>!t.completed&&(!t.due_on||t.due_on<=today))
+      .sort(taskSort)
+      .map(t=>String(t.title||"").trim()+(t.assignee?"("+t.assignee+")":""))
+      .filter(Boolean);
+  }
+  function shoppingToday(){
+    return state.shopping
+      .filter(x=>x.needed)
+      .map(x=>String(x.product||"").trim()+(x.quantity?" ×"+String(x.quantity).trim():""))
+      .filter(Boolean);
+  }
   function todoLinesHTML(lines){
     return lines.map(x=>'<div class="schedule-todo-line">'+esc(x)+'</div>').join("");
   }
@@ -213,9 +234,10 @@
     $("weather-summary").innerHTML='<div class="weather-summary"><strong>朝</strong> '+weatherPart(now.morning_weather,now.morning_temp_c,now.morning_rain_pct)+' <span class="muted">／</span> <strong>夕</strong> '+weatherPart(now.evening_weather,now.evening_temp_c,now.evening_rain_pct)+'</div>';
     $("today-schedule").innerHTML=agendaDetails(today,now,true);
     showOptional("today-lunch",now.lunch);
-    setScheduleTodo("today-todo",scheduleTodoItems(today,now,today));
-    const needed=state.shopping.filter(x=>x.needed);
-    showOptional("today-shopping",shortSummary(needed,x=>String(x.product||"").trim()));
+    setScheduleTodo("today-garbage",garbageScheduleLines(now.garbage));
+    setScheduleTodo("today-cleaning",dueCleaningToday(today));
+    setScheduleTodo("today-task",dueTasksToday(today));
+    setScheduleTodo("today-shopping",shoppingToday());
 
     const tomorrow=dateAdd(today,1),next=byDate.get(tomorrow)||{};
     setDayHeading("tomorrow-title","tomorrow-holiday",tomorrow);
@@ -223,7 +245,7 @@
       ' <span class="muted">／</span> <span class="tomorrow-forecast"><strong>夕</strong> '+weatherPart(next.evening_weather,next.evening_temp_c,next.evening_rain_pct)+'</span>';
     $("tomorrow-schedule").innerHTML=agendaDetails(tomorrow,next,true);
     showOptional("tomorrow-lunch",next.lunch);
-    setScheduleTodo("tomorrow-todo",scheduleTodoItems(tomorrow,next,today));
+    showOptional("tomorrow-garbage",next.garbage);
 
     const upcoming=Array.from({length:7},(_,i)=>dateAdd(today,i+2));
     const displayed=upcoming
