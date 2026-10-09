@@ -23,7 +23,8 @@
     return Array.from({length:new Date(Date.UTC(y,m,0)).getUTCDate()},(_,i)=>month+"-"+String(i+1).padStart(2,"0"));
   };
   const state={client:null,user:null,role:null,tab:"dashboard",daily:[],shopping:[],cleaning:[],members:[],
-    month:isoToday().slice(0,7),mode:"schedule",monthCache:null,monthRows:new Map(),draft:new Map(),opened:new Set()};
+    month:isoToday().slice(0,7),mode:"schedule",monthCache:null,monthRows:new Map(),draft:new Map(),opened:new Set(),
+    tasks:[],shoppingCategory:"食品",showCompleted:false};
   let toastTimeout;
   const check = r => {if(r.error)throw r.error;return r.data;};
   const errorText=e=>e?.message||String(e);
@@ -46,8 +47,7 @@
     document.querySelectorAll(".page").forEach(el=>el.classList.toggle("active",el.id==="page-"+page));
     document.querySelectorAll(".tabbar [data-tab]").forEach(el=>el.classList.toggle("active",el.dataset.tab===(page==="month"?"dashboard":page)));
     if(page==="month"){renderMonth();loadMonth().catch(e=>report(e,"月間読込: "));}
-    if(page==="shopping")renderShopping();
-    if(page==="cleaning")renderCleaning();
+    if(page==="todo")renderTodo();
     if(page==="settings")loadMembers().catch(e=>report(e,"メンバー読込: "));
     scrollTo(0,0);
   }
@@ -103,13 +103,14 @@
   }
   async function refresh(){
     $("page-status").textContent="データを読み込み中…";
-    const [d,c,s]=await Promise.all([
+    const [d,c,s,t]=await Promise.all([
       state.client.from("daily").select("*").gte("day",isoToday()).lte("day",dateAdd(isoToday(),8)).order("day"),
       state.client.from("cleaning").select("*").order("id"),
-      state.client.from("shopping").select("*").order("sort_order",{ascending:true,nullsFirst:false})
+      state.client.from("shopping").select("*").order("sort_order",{ascending:true,nullsFirst:false}),
+      state.client.from("tasks").select("*").order("created_at",{ascending:true})
     ]);
-    state.daily=check(d);state.cleaning=check(c);state.shopping=check(s);
-    renderDashboard();renderShopping();renderCleaning();
+    state.daily=check(d);state.cleaning=check(c);state.shopping=check(s);state.tasks=check(t);
+    renderDashboard();renderTodo();
     $("page-status").textContent="Supabase接続中 · "+new Date().toLocaleTimeString("ja-JP",{timeZone:"Asia/Tokyo",hour:"2-digit",minute:"2-digit"})+" 読込";
   }
   function line(label,value){
@@ -199,10 +200,46 @@
     $("future-card").hidden=!upcoming.length;
     $("schedule-list").innerHTML=upcoming.map(day=>agendaDetails(day,byDate.get(day)||{})).join("");
   }
+  function taskSort(a,b){
+    const d1=a.due_on||"9999-12-31",d2=b.due_on||"9999-12-31";
+    return d1.localeCompare(d2)||String(a.created_at).localeCompare(String(b.created_at));
+  }
+  function taskDetail(t){
+    return [t.assignee||"",t.due_on?fmtDay(t.due_on):""].filter(Boolean).join(" · ");
+  }
+  function todoRow(label,meta,kind,id,checked=false){
+    const action=kind==="task"?"task-completed":kind==="shopping"?"todo-bought":"todo-cleaned";
+    const badge=kind==="task"?"タスク":kind==="shopping"?"買い物":"掃除";
+    const edited=kind==="task"?'<button type="button" class="btn ghost smallbtn task-edit" data-action="edit-task" data-id="'+esc(id)+'" aria-label="'+esc(label)+'を編集">編集</button>':"";
+    return '<div class="todo-row'+(checked?" completed":"")+'"><label class="checkboxlabel todo-check"><input type="checkbox" data-action="'+action+'" data-id="'+esc(id)+'" '+(checked?"checked":"")+'><span class="todo-copy"><span class="todo-title">'+esc(label)+'</span><span class="todo-meta"><span class="todo-origin">'+badge+'</span>'+(meta?" · "+esc(meta):"")+'</span></span></label>'+edited+'</div>';
+  }
+  function renderTodo(){
+    const today=isoToday();
+    const openTasks=state.tasks.filter(t=>!t.completed).sort(taskSort);
+    const dueCleaning=state.cleaning.filter(c=>!c.next_due||c.next_due<=today)
+      .sort((a,b)=>String(a.next_due||"").localeCompare(String(b.next_due||"")));
+    const needed=state.shopping.filter(x=>x.needed);
+    const all=openTasks.map(t=>({kind:"task",id:t.id,label:t.title,meta:taskDetail(t),due:t.due_on||"9999-12-31"}))
+      .concat(dueCleaning.map(c=>({kind:"cleaning",id:c.id,label:c.name,meta:c.next_due?fmtDay(c.next_due):"期限なし",due:c.next_due||"9999-12-31"})))
+      .concat(needed.map(x=>({kind:"shopping",id:x.id,label:x.product+(x.quantity?" ×"+x.quantity:""),meta:x.category||"",due:"9999-12-31"})));
+    const order={task:0,cleaning:1,shopping:2};
+    all.sort((a,b)=>a.due.localeCompare(b.due)||order[a.kind]-order[b.kind]||a.label.localeCompare(b.label,"ja"));
+    $("todo-items").innerHTML=all.length?all.map(t=>todoRow(t.label,t.meta,t.kind,t.id)).join(""):'<p class="empty">やることはありません</p>';
+    $("todo-count").textContent=all.length?"("+all.length+")":"";
+    const completed=state.tasks.filter(t=>t.completed).sort((a,b)=>String(b.completed_at||"").localeCompare(String(a.completed_at||"")));
+    $("todo-show-completed").hidden=!completed.length;
+    $("todo-show-completed").textContent="完了済み "+completed.length+"件 "+(state.showCompleted?"▲":"▼");
+    $("todo-completed-list").hidden=!state.showCompleted||!completed.length;
+    $("todo-completed-list").innerHTML=state.showCompleted?completed.map(t=>todoRow(t.title,taskDetail(t),"task",t.id,true)).join(""):"";
+    renderShopping();renderCleaning();
+  }
   function renderShopping(){
-    const filter=$("shopping-filter").value;
-    const rows=state.shopping.filter(x=>filter==="all"||filter==="needed"&&x.needed||filter==="quick"&&x.quick_display);
-    $("shopping-items").innerHTML=rows.length?rows.map(x=>shoppingRow(x)).join(""):'<p class="empty">該当する商品がありません</p>';
+    const cats=["食品","雑貨","育児",...state.shopping.map(x=>String(x.category||"").trim()||"未分類")]
+      .filter((x,i,a)=>a.indexOf(x)===i);
+    if(!cats.includes(state.shoppingCategory))state.shoppingCategory="食品";
+    $("shopping-categories").innerHTML=cats.map(cat=>'<button type="button" data-action="shopping-category" data-category="'+esc(cat)+'" class="category-pill'+(state.shoppingCategory===cat?" active":"")+'">'+esc(cat)+'</button>').join("");
+    const rows=state.shopping.filter(x=>(String(x.category||"").trim()||"未分類")===state.shoppingCategory);
+    $("shopping-items").innerHTML=rows.length?rows.map(x=>shoppingRow(x)).join(""):'<p class="empty">このカテゴリの商品はありません</p>';
   }
   function renderCleaning(){
     $("cleaning-items").innerHTML=state.cleaning.map(c=>'<div class="itemrow"><div class="itemmain"><div class="item-title">'+esc(c.name)+'</div><div class="item-sub">周期 '+esc(c.interval_days||"未設定")+'日 · 最終 '+esc(c.last_done||"—")+' · 次回 '+esc(c.next_due||"—")+'</div></div><button type="button" class="btn secondary smallbtn" data-action="done-clean" data-id="'+esc(c.id)+'">完了</button></div>').join("")||'<p class="empty">掃除項目はありません</p>';
@@ -223,9 +260,28 @@
   }
   async function editShopping(id){
     const x=state.shopping.find(a=>a.id===id)||{};
+    const category=x.category||state.shoppingCategory||"食品";
+    const categories=["食品","雑貨","育児",...state.shopping.map(x=>x.category).filter(Boolean),category].filter((v,i,a)=>a.indexOf(v)===i);
     const html='<form id="modal-form" data-kind="shopping"><input type="hidden" name="id" value="'+esc(id||"")+'">'+
-      Object.entries({product:"商品名",quantity:"数量",category:"カテゴリ",store:"購入場所",note:"メモ"}).map(([k,v])=>'<label class="field">'+v+'</label>'+(k==="note"?'<textarea name="'+k+'" rows="3">'+esc(x[k]||"")+'</textarea>':'<input class="input" name="'+k+'" value="'+esc(x[k]||(k==="quantity"?"1":""))+'" '+(k==="product"?"required maxlength='150'":"")+'>')).join("")+'</form>';
+      '<label class="field" for="shopping-product">商品名</label><input class="input" name="product" id="shopping-product" value="'+esc(x.product||"")+'" required maxlength="150">'+
+      '<label class="field">カテゴリ</label><select class="input" name="category">'+categories.map(c=>'<option value="'+esc(c)+'" '+(c===category?"selected":"")+'>'+esc(c)+'</option>').join("")+'</select>'+
+      '<label class="field">数量</label><input class="input" name="quantity" value="'+esc(x.quantity||"1")+'">'+
+      '<label class="field">購入場所</label><input class="input" name="store" value="'+esc(x.store||"")+'">'+
+      '<label class="field">メモ</label><textarea name="note" rows="3">'+esc(x.note||"")+'</textarea></form>';
     modal(id?"商品を編集":"買い物を追加",html,actions());
+  }
+  async function editTask(id){
+    const t=state.tasks.find(x=>x.id===id)||{};
+    const html='<form id="modal-form" data-kind="task"><input type="hidden" name="id" value="'+esc(t.id||"")+'">'+
+      '<label class="field" for="task-title">やること名</label><input class="input" id="task-title" name="title" value="'+esc(t.title||"")+'" maxlength="200" required>'+
+      '<label class="field" for="task-assignee">担当</label><select class="input" id="task-assignee" name="assignee">'+
+      [["","指定なし"],["パパ","パパ"],["ママ","ママ"],["カイ","カイ"]].map(([v,label])=>'<option value="'+v+'" '+((t.assignee||"")===v?"selected":"")+'>'+label+'</option>').join("")+'</select>'+
+      '<label class="field" for="task-date">予定日・期限（任意）</label><input class="input" id="task-date" type="date" name="due_on" value="'+esc(t.due_on||"")+'">'+
+      '</form>';
+    const footer='<button class="btn secondary" type="button" data-action="close">キャンセル</button>'+
+      (id?'<button class="btn danger" type="button" data-action="delete-task" data-id="'+esc(id)+'">削除</button>':"")+
+      '<button class="btn" type="submit" form="modal-form">保存</button>';
+    modal(id?"やることを編集":"やることを追加",html,footer);
   }
   function monthValue(day,k){
     const change=state.draft.get(day);
@@ -287,6 +343,34 @@
     if(fail.length)toast("保存失敗: "+fail.slice(0,2).join(", "),true);
     await loadMonth(true);await refresh();
   }
+  async function toggleTask(el){
+    const checked=el.checked;el.disabled=true;
+    try{
+      check(await state.client.from("tasks").update({completed:checked,completed_at:checked?new Date().toISOString():null,updated_at:new Date().toISOString()}).eq("id",el.dataset.id));
+      await refresh();toast(checked?"完了したよ！":"未完了に戻したよ");
+    }catch(e){el.checked=!checked;report(e,"タスク更新: ");}
+    finally{el.disabled=false;}
+  }
+  async function completeShopping(el){
+    el.disabled=true;
+    try{
+      check(await state.client.from("shopping").update({needed:false,last_bought:isoToday(),updated_at:new Date().toISOString()}).eq("id",el.dataset.id));
+      await refresh();toast("買い物を完了したよ！");
+    }catch(e){el.checked=false;report(e,"購入更新: ");}
+    finally{el.disabled=false;}
+  }
+  async function completeCleaning(el){
+    el.disabled=true;
+    try{await finishCleaning(el.dataset.id);}
+    catch(e){report(e,"掃除更新: ");}
+    finally{el.checked=false;el.disabled=false;}
+  }
+  async function deleteTask(id){
+    const t=state.tasks.find(t=>t.id===id);
+    if(!t||!confirm("「"+t.title+"」を削除する？"))return;
+    check(await state.client.from("tasks").delete().eq("id",id));
+    closeModal();await refresh();toast("タスクを削除したよ");
+  }
   async function finishCleaning(id){
     const x=state.cleaning.find(c=>c.id===id);if(!x)return;
     if(!confirm("「"+x.name+"」を今日完了にする？"))return;
@@ -329,6 +413,13 @@
         const data={};fields.forEach(k=>data[k]=String(fd.get(k)||"").trim()||null);
         await updateDay(String(fd.get("day")),data);
         state.monthCache=null;
+      }else if(kind==="task"){
+        const id=String(fd.get("id")||"");
+        const props={title:String(fd.get("title")||"").trim(),assignee:String(fd.get("assignee")||"")||null,due_on:String(fd.get("due_on")||"")||null,updated_at:new Date().toISOString()};
+        if(!props.title||props.title.length>200)throw Error("やること名を入力してください（200文字まで）");
+        if(props.assignee&&!["パパ","ママ","カイ"].includes(props.assignee))throw Error("担当者を確認してください");
+        if(id)check(await state.client.from("tasks").update(props).eq("id",id));
+        else check(await state.client.from("tasks").insert(props));
       }else if(kind==="shopping"){
         const id=String(fd.get("id")||"");
         const props={product:String(fd.get("product")||"").trim(),quantity:String(fd.get("quantity")||"").trim()||null,category:String(fd.get("category")||"").trim()||null,store:String(fd.get("store")||"").trim()||null,note:String(fd.get("note")||"").trim()||null,updated_at:new Date().toISOString()};
@@ -359,14 +450,22 @@
       if(a==="collapse-all"){state.opened.clear();renderMonth();}
       if(a==="save-month")await saveMonth();
       if(a==="done-clean")await finishCleaning(el.dataset.id);
+      if(a==="add-task")await editTask("");
+      if(a==="edit-task")await editTask(el.dataset.id);
+      if(a==="delete-task")await deleteTask(el.dataset.id);
+      if(a==="toggle-completed"){state.showCompleted=!state.showCompleted;renderTodo();}
+      if(a==="shopping-category"){state.shoppingCategory=el.dataset.category;renderShopping();}
       if(a==="add-shopping")await editShopping("");
       if(a==="edit-shopping")await editShopping(el.dataset.id);
       if(a==="remove-member")await removeMember(el.dataset.email);
     }catch(error){report(error,"操作エラー: ");}
   }
   function change(e){
-    if(e.target.matches('input[data-action="shopping-needed"]'))toggleShopping(e.target);
-    if(e.target.id==="shopping-filter")renderShopping();
+    const el=e.target;
+    if(el.matches('input[data-action="shopping-needed"]'))toggleShopping(el);
+    if(el.matches('input[data-action="task-completed"]'))toggleTask(el);
+    if(el.matches('input[data-action="todo-bought"]'))completeShopping(el);
+    if(el.matches('input[data-action="todo-cleaned"]'))completeCleaning(el);
   }
   function input(e){if(e.target.matches("textarea[data-month-field]"))updateDraft(e.target);}
   async function submit(e){
