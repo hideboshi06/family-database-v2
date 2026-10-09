@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#f3f7fa">
 <meta name="description" content="Family Database v2 — 家族の予定・給食・掃除・買い物">
 <title>Family Database</title>
-<link rel="stylesheet" href="./styles.css?v=20261009-todohub">
+<link rel="stylesheet" href="./styles.css?v=20261009-taskfix">
 </head>
 <body>
 <!-- Compatibility for older cached app.js versions; never shown to the user. -->
@@ -188,6 +188,7 @@
   <div class="sheetmodal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
     <h2 id="modal-title"></h2>
     <div id="modal-content"></div>
+    <p id="modal-save-status" class="status" role="status" aria-live="polite" hidden></p>
     <div id="modal-actions" class="modal-actions"></div>
   </div>
 </div>
@@ -195,6 +196,6 @@
 
 <script>window.FD_CONFIG = {url:"https://besevrrmhwmkdqmoiscf.supabase.co",key:"sb_publishable_oo7Bdb8Ip-icb6Y0nqovKg_OH9Taql2"};</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="./app.js?v=20261009-todohub" defer></script>
+<script src="./app.js?v=20261009-taskfix" defer></script>
 </body>
 </html>
