@@ -164,7 +164,7 @@
   // No outer "予定" row, so entries line up with lunch and garbage.
   function renderDailyAgenda(id,row){
     const lines=filledAgendaFields(row).map(k=>line(person[k],row[k])).join("");
-    $(id).innerHTML=lines||'<div class="empty daily-agenda-empty">予定なし</div>';
+    $(id).innerHTML=lines||line("予定","なし");
   }
   // Keep persisted item names untouched: cleaning suffixes are display-only.
   function cleaningScheduleName(raw){
