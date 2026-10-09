@@ -322,3 +322,11 @@ details.help summary{color:var(--navy);cursor:pointer;font-size:12px}
 .todo-shopping-card .itemrow:first-of-type{border-top:0}
 .todo-shopping-card .itemrow{padding:11px 0}
 .todo-cleaning-card .itemrow{padding:11px 0}
+
+/* Shopping categories stay next to the heading without shrinking the labels. */
+.shopping-head{display:flex;align-items:center;gap:12px;min-width:0}
+.shopping-head h2{flex:0 0 auto;white-space:nowrap}
+.shopping-head .category-pills{flex:1;min-width:0;padding:0;gap:6px}
+.shopping-head .category-pill{padding:7px 11px}
+.shopping-tools{display:flex;align-items:center;justify-content:space-between;margin-top:10px;gap:10px}
+.shopping-tools .tiny{white-space:nowrap}
