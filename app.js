@@ -13,7 +13,11 @@
   const dateAdd=(day,n)=>{let d=new Date(day+"T12:00:00Z");d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);};
   const weekday=day=>new Date(day+"T12:00:00Z").getUTCDay();
   const fmtDay=day=>Number(day.slice(5,7))+"/"+Number(day.slice(8))+"("+["日","月","火","水","木","金","土"][weekday(day)]+")";
-  const weekend=day=>weekday(day)===0?"sun":weekday(day)===6?"sat":"";
+  // Japan Cabinet Office holidays for 2026-2027, including substitute and bridge holidays.
+  // Update the year-specific table after the government announces subsequent dates.
+  const holidays={"2026":{"01-01":"元日","01-12":"成人の日","02-11":"建国記念の日","02-23":"天皇誕生日","03-20":"春分の日","04-29":"昭和の日","05-03":"憲法記念日","05-04":"みどりの日","05-05":"こどもの日","05-06":"振替休日","07-20":"海の日","08-11":"山の日","09-21":"敬老の日","09-22":"国民の休日","09-23":"秋分の日","10-12":"スポーツの日","11-03":"文化の日","11-23":"勤労感謝の日"},"2027":{"01-01":"元日","01-11":"成人の日","02-11":"建国記念の日","02-23":"天皇誕生日","03-21":"春分の日","03-22":"振替休日","04-29":"昭和の日","05-03":"憲法記念日","05-04":"みどりの日","05-05":"こどもの日","07-19":"海の日","08-11":"山の日","09-20":"敬老の日","09-23":"秋分の日","10-11":"スポーツの日","11-03":"文化の日","11-23":"勤労感謝の日"}};
+  const holidayName=day=>holidays[day.slice(0,4)]?.[day.slice(5)]||"";
+  const weekend=day=>weekday(day)===0||holidayName(day)?"sun":weekday(day)===6?"sat":"";
   const monthDays=month=>{
     const [y,m]=month.split("-").map(Number);
     return Array.from({length:new Date(Date.UTC(y,m,0)).getUTCDate()},(_,i)=>month+"-"+String(i+1).padStart(2,"0"));
@@ -148,42 +152,50 @@
   function agendaDetails(day,row,compact=false){
     const lines=filledAgendaFields(row).map(k=>line(person[k],row[k])).join("");
     return '<div class="dayrow'+(compact?' dayrow-inline':'')+'">'+
-      (compact?"":'<button type="button" data-action="edit-day" data-day="'+day+'" class="daydate '+weekend(day)+'">'+fmtDay(day)+'</button>')+
+      (compact?"":'<button type="button" data-action="edit-day" data-day="'+day+'" class="daydate '+weekend(day)+'">'+fmtDay(day)+(holidayName(day)?' <span class="holiday-name">'+esc(holidayName(day))+'</span>':"")+'</button>')+
       '<div class="daycontent">'+(lines||'<div class="empty">予定なし</div>')+'</div></div>';
   }
   function shortSummary(items,label){
-    if(!items.length)return "なし";
+    if(!items.length)return "";
     const names=items.slice(0,2).map(label).filter(Boolean).join("、");
     return items.length+"件"+(names?" · "+names:"")+(items.length>2?" ほか"+(items.length-2)+"件":"");
   }
+  function showOptional(id,value){
+    $(id+"-block").hidden=!String(value||"").trim();
+    $(id).textContent=value||"";
+  }
+  function setDayHeading(id,holidayId,day){
+    const button=$(id),name=holidayName(day),tone=weekend(day);
+    button.textContent=fmtDay(day);
+    button.dataset.day=day;
+    button.classList.toggle("sat",tone==="sat");
+    button.classList.toggle("sun",tone==="sun");
+    $(holidayId).textContent=name;
+    $(holidayId).hidden=!name;
+  }
   function renderDashboard(){
     const today=isoToday(),byDate=new Map(state.daily.map(x=>[x.day,x])),now=byDate.get(today)||{};
-    $("today-date").textContent=fmtDay(today);
-    $("today-date").dataset.day=today;
+    setDayHeading("today-date","today-holiday",today);
     $("weather-summary").innerHTML='<div class="weather-summary"><strong>朝</strong> '+weatherPart(now.morning_weather,now.morning_temp_c,now.morning_rain_pct)+' <span class="muted">／</span> <strong>夕</strong> '+weatherPart(now.evening_weather,now.evening_temp_c,now.evening_rain_pct)+'</div>';
-    $("today-lunch").textContent=now.lunch||"未登録";
-    $("today-garbage").textContent=now.garbage||"未登録";
-    const todayHasPlans=filledAgendaFields(now).length>0;
-    $("today-agenda-block").hidden=!todayHasPlans;
-    $("today-schedule").innerHTML=todayHasPlans?agendaDetails(today,now,true):"";
+    $("today-schedule").innerHTML=agendaDetails(today,now,true);
+    showOptional("today-lunch",now.lunch);
+    showOptional("today-garbage",now.garbage);
     const due=state.cleaning.filter(c=>!c.next_due||c.next_due<=today);
+    $("today-cleaning-block").hidden=!due.length;
+    $("today-cleaning").innerHTML=due.map(c=>'<div class="task-line">'+esc(c.name)+'</div>').join("");
     const needed=state.shopping.filter(x=>x.needed);
-    $("today-cleaning").textContent=shortSummary(due,c=>String(c.name||"").trim());
-    $("today-shopping").textContent=shortSummary(needed,x=>String(x.product||"").trim());
+    showOptional("today-shopping",shortSummary(needed,x=>String(x.product||"").trim()));
 
     const tomorrow=dateAdd(today,1),next=byDate.get(tomorrow)||{};
-    $("tomorrow-title").textContent=fmtDay(tomorrow);
-    $("tomorrow-title").dataset.day=tomorrow;
+    setDayHeading("tomorrow-title","tomorrow-holiday",tomorrow);
     $("tomorrow-weather").innerHTML='<span class="tomorrow-forecast"><strong>朝</strong> '+weatherPart(next.morning_weather,next.morning_temp_c,next.morning_rain_pct)+'</span>'+
       ' <span class="muted">／</span> <span class="tomorrow-forecast"><strong>夕</strong> '+weatherPart(next.evening_weather,next.evening_temp_c,next.evening_rain_pct)+'</span>';
-    $("tomorrow-lunch").textContent=next.lunch||"未登録";
-    $("tomorrow-garbage").textContent=next.garbage||"未登録";
-    const tomorrowHasPlans=filledAgendaFields(next).length>0;
-    $("tomorrow-agenda-block").hidden=!tomorrowHasPlans;
-    $("tomorrow-schedule").innerHTML=tomorrowHasPlans?agendaDetails(tomorrow,next,true):"";
+    $("tomorrow-schedule").innerHTML=agendaDetails(tomorrow,next,true);
+    showOptional("tomorrow-lunch",next.lunch);
+    showOptional("tomorrow-garbage",next.garbage);
 
     const upcoming=Array.from({length:7},(_,i)=>dateAdd(today,i+2))
-      .filter(day=>filledAgendaFields(byDate.get(day)||{}).length>0);
+      .filter(day=>filledAgendaFields(byDate.get(day)||{}).length>0||holidayName(day));
     $("future-card").hidden=!upcoming.length;
     $("schedule-list").innerHTML=upcoming.map(day=>agendaDetails(day,byDate.get(day)||{})).join("");
   }
@@ -227,7 +239,7 @@
     $("month-days").innerHTML=arr.map(day=>{
       const changed=state.draft.has(day),opened=state.opened.has(day);
       const preview=f.map(k=>monthValue(day,k)).filter(Boolean).map(x=>String(x).replace(/\s+/g," ").slice(0,20)).join(" / ");
-      return '<div class="monthday'+(changed?" dirty":"")+'"><button type="button" class="monthtop" data-action="expand-day" data-day="'+day+'"><span class="monthdate '+weekend(day)+'">'+fmtDay(day)+(changed?'<span class="changedmark">変更</span>':"")+'</span><span class="monthpreview">'+esc(preview||"未入力")+'</span><span class="tiny">'+(opened?"▲":"▼")+'</span></button>'+
+      return '<div class="monthday'+(changed?" dirty":"")+'"><button type="button" class="monthtop" data-action="expand-day" data-day="'+day+'"><span class="monthdate '+weekend(day)+'">'+fmtDay(day)+(holidayName(day)?'<span class="holiday-name month-holiday">'+esc(holidayName(day))+'</span>':"")+(changed?'<span class="changedmark">変更</span>':"")+'</span><span class="monthpreview">'+esc(preview||"未入力")+'</span><span class="tiny">'+(opened?"▲":"▼")+'</span></button>'+
         (opened?'<div class="monthfields">'+f.map(k=>'<label class="field">'+person[k]+'</label><textarea data-month-field="'+k+'" data-day="'+day+'" rows="'+(k==="lunch"?5:2)+'" placeholder="'+person[k]+'を入力・貼り付け">'+esc(monthValue(day,k))+'</textarea>').join("")+'</div>':"")+'</div>';
     }).join("");
     updateCount();
@@ -335,6 +347,7 @@
     try{
       if(a==="login")await signIn();
       if(a==="logout"||a==="switch")await signOut();
+      if(a==="reload"){location.reload();return;}
       if(a==="refresh"){await refresh();toast("更新したよ！");}
       if(a==="edit-day")await editDay(el.dataset.day);
       if(a==="close")closeModal();
