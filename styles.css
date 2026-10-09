@@ -330,3 +330,7 @@ details.help summary{color:var(--navy);cursor:pointer;font-size:12px}
 .shopping-head .category-pill{padding:7px 11px}
 .shopping-tools{display:flex;align-items:center;justify-content:space-between;margin-top:10px;gap:10px}
 .shopping-tools .tiny{white-space:nowrap}
+
+/* Task registration status stays visible inside the editor instead of disappearing as a toast. */
+#modal-save-status{margin:8px 0 3px;line-height:1.6}
+#modal-save-status.err{font-weight:650}
