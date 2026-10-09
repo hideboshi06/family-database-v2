@@ -160,6 +160,12 @@
       (compact?"":'<button type="button" data-action="edit-day" data-day="'+day+'" class="daydate '+weekend(day)+'">'+fmtDay(day)+(holidayName(day)?' <span class="holiday-name">'+esc(holidayName(day))+'</span>':"")+'</button>')+
       '<div class="daycontent">'+(lines||'<div class="empty">予定なし</div>')+'</div></div>';
   }
+  // Today/tomorrow use the same two-column person labels as the future agenda.
+  // No outer "予定" row, so entries line up with lunch and garbage.
+  function renderDailyAgenda(id,row){
+    const lines=filledAgendaFields(row).map(k=>line(person[k],row[k])).join("");
+    $(id).innerHTML=lines||'<div class="empty daily-agenda-empty">予定なし</div>';
+  }
   // Keep persisted item names untouched: cleaning suffixes are display-only.
   function cleaningScheduleName(raw){
     const name=String(raw||"").trim();
@@ -217,7 +223,7 @@
     const today=isoToday(),byDate=new Map(state.daily.map(x=>[x.day,x])),now=byDate.get(today)||{};
     setDayHeading("today-date","today-holiday",today);
     $("weather-summary").innerHTML='<div class="weather-summary"><strong>朝</strong> '+weatherPart(now.morning_weather,now.morning_temp_c,now.morning_rain_pct)+' <span class="muted">／</span> <strong>夕</strong> '+weatherPart(now.evening_weather,now.evening_temp_c,now.evening_rain_pct)+'</div>';
-    $("today-schedule").innerHTML=agendaDetails(today,now,true);
+    renderDailyAgenda("today-schedule",now);
     showOptional("today-lunch",now.lunch);
     setScheduleTodo("today-garbage",garbageScheduleLines(now.garbage));
     setScheduleTodo("today-cleaning",dueCleaningToday(today));
@@ -228,7 +234,7 @@
     setDayHeading("tomorrow-title","tomorrow-holiday",tomorrow);
     $("tomorrow-weather").innerHTML='<span class="tomorrow-forecast"><strong>朝</strong> '+weatherPart(next.morning_weather,next.morning_temp_c,next.morning_rain_pct)+'</span>'+
       ' <span class="muted">／</span> <span class="tomorrow-forecast"><strong>夕</strong> '+weatherPart(next.evening_weather,next.evening_temp_c,next.evening_rain_pct)+'</span>';
-    $("tomorrow-schedule").innerHTML=agendaDetails(tomorrow,next,true);
+    renderDailyAgenda("tomorrow-schedule",next);
     showOptional("tomorrow-lunch",next.lunch);
     showOptional("tomorrow-garbage",next.garbage);
 
