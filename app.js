@@ -154,14 +154,11 @@
   function filledAgendaFields(row){
     return fields.filter(k=>row[k]&&String(row[k]).trim());
   }
-  function agendaDetails(day,row,compact=false,todos=[]){
+  function agendaDetails(day,row,compact=false){
     const lines=filledAgendaFields(row).map(k=>line(person[k],row[k])).join("");
-    const futureTasks=!compact&&todos.length
-      ?'<div class="future-todo-group"><span class="future-todo-label">やること</span><div class="schedule-todo-list">'+todoLinesHTML(todos)+'</div></div>'
-      :"";
     return '<div class="dayrow'+(compact?' dayrow-inline':'')+'">'+
       (compact?"":'<button type="button" data-action="edit-day" data-day="'+day+'" class="daydate '+weekend(day)+'">'+fmtDay(day)+(holidayName(day)?' <span class="holiday-name">'+esc(holidayName(day))+'</span>':"")+'</button>')+
-      '<div class="daycontent">'+(lines||(!futureTasks?'<div class="empty">予定なし</div>':""))+futureTasks+'</div></div>';
+      '<div class="daycontent">'+(lines||'<div class="empty">予定なし</div>')+'</div></div>';
   }
   // Keep persisted item names untouched: cleaning suffixes are display-only.
   function cleaningScheduleName(raw){
@@ -169,18 +166,6 @@
     if(!name)return "";
     if(name.endsWith("掃除"))return name;
     return name.replace(/(拭き|ふき)$/u,"")+"掃除";
-  }
-  // Undated and overdue tasks belong to today; future dates show only their own tasks.
-  function scheduleTodoItems(day,row,today){
-    const trash=String(row.garbage||"").split(/\r?\n/u).map(s=>s.trim()).filter(Boolean);
-    const cleaning=state.cleaning
-      .filter(c=>c.next_due===day||(day===today&&(!c.next_due||c.next_due<today)))
-      .map(c=>cleaningScheduleName(c.name)).filter(Boolean);
-    const tasks=state.tasks
-      .filter(t=>!t.completed&&(t.due_on===day||(day===today&&(!t.due_on||t.due_on<today))))
-      .sort(taskSort)
-      .map(t=>String(t.title||"").trim()+(t.assignee?"("+t.assignee+")":"")).filter(Boolean);
-    return trash.concat(cleaning,tasks);
   }
   function garbageScheduleLines(value){
     return String(value||"").split(/\r?\n/u).map(x=>x.trim()).filter(Boolean);
@@ -247,12 +232,11 @@
     showOptional("tomorrow-lunch",next.lunch);
     showOptional("tomorrow-garbage",next.garbage);
 
-    const upcoming=Array.from({length:7},(_,i)=>dateAdd(today,i+2));
-    const displayed=upcoming
-      .map(day=>({day,row:byDate.get(day)||{},todos:scheduleTodoItems(day,byDate.get(day)||{},today)}))
-      .filter(x=>filledAgendaFields(x.row).length>0||holidayName(x.day)||x.todos.length>0);
-    $("future-card").hidden=!displayed.length;
-    $("schedule-list").innerHTML=displayed.map(x=>agendaDetails(x.day,x.row,false,x.todos)).join("");
+    // Future section is for scheduled family plans only, never garbage, cleaning or tasks.
+    const upcoming=Array.from({length:7},(_,i)=>dateAdd(today,i+2))
+      .filter(day=>filledAgendaFields(byDate.get(day)||{}).length>0);
+    $("future-card").hidden=!upcoming.length;
+    $("schedule-list").innerHTML=upcoming.map(day=>agendaDetails(day,byDate.get(day)||{})).join("");
   }
   function taskSort(a,b){
     const d1=a.due_on||"9999-12-31",d2=b.due_on||"9999-12-31";
