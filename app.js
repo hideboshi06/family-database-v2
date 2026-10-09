@@ -154,11 +154,40 @@
   function filledAgendaFields(row){
     return fields.filter(k=>row[k]&&String(row[k]).trim());
   }
-  function agendaDetails(day,row,compact=false){
+  function agendaDetails(day,row,compact=false,todos=[]){
     const lines=filledAgendaFields(row).map(k=>line(person[k],row[k])).join("");
+    const futureTasks=!compact&&todos.length
+      ?'<div class="future-todo-group"><span class="future-todo-label">やること</span><div class="schedule-todo-list">'+todoLinesHTML(todos)+'</div></div>'
+      :"";
     return '<div class="dayrow'+(compact?' dayrow-inline':'')+'">'+
       (compact?"":'<button type="button" data-action="edit-day" data-day="'+day+'" class="daydate '+weekend(day)+'">'+fmtDay(day)+(holidayName(day)?' <span class="holiday-name">'+esc(holidayName(day))+'</span>':"")+'</button>')+
-      '<div class="daycontent">'+(lines||'<div class="empty">予定なし</div>')+'</div></div>';
+      '<div class="daycontent">'+(lines||(!futureTasks?'<div class="empty">予定なし</div>':""))+futureTasks+'</div></div>';
+  }
+  // Keep persisted item names untouched: cleaning suffixes are display-only.
+  function cleaningScheduleName(raw){
+    const name=String(raw||"").trim();
+    if(!name)return "";
+    if(name.endsWith("掃除"))return name;
+    return name.replace(/(拭き|ふき)$/u,"")+"掃除";
+  }
+  // Undated and overdue tasks belong to today; future dates show only their own tasks.
+  function scheduleTodoItems(day,row,today){
+    const trash=String(row.garbage||"").split(/\r?\n/u).map(s=>s.trim()).filter(Boolean);
+    const cleaning=state.cleaning
+      .filter(c=>c.next_due===day||(day===today&&(!c.next_due||c.next_due<today)))
+      .map(c=>cleaningScheduleName(c.name)).filter(Boolean);
+    const tasks=state.tasks
+      .filter(t=>!t.completed&&(t.due_on===day||(day===today&&(!t.due_on||t.due_on<today))))
+      .sort(taskSort)
+      .map(t=>String(t.title||"").trim()+(t.assignee?"("+t.assignee+")":"")).filter(Boolean);
+    return trash.concat(cleaning,tasks);
+  }
+  function todoLinesHTML(lines){
+    return lines.map(x=>'<div class="schedule-todo-line">'+esc(x)+'</div>').join("");
+  }
+  function setScheduleTodo(id,lines){
+    $(id+"-block").hidden=!lines.length;
+    $(id).innerHTML=todoLinesHTML(lines);
   }
   function shortSummary(items,label){
     if(!items.length)return "";
@@ -184,10 +213,7 @@
     $("weather-summary").innerHTML='<div class="weather-summary"><strong>朝</strong> '+weatherPart(now.morning_weather,now.morning_temp_c,now.morning_rain_pct)+' <span class="muted">／</span> <strong>夕</strong> '+weatherPart(now.evening_weather,now.evening_temp_c,now.evening_rain_pct)+'</div>';
     $("today-schedule").innerHTML=agendaDetails(today,now,true);
     showOptional("today-lunch",now.lunch);
-    showOptional("today-garbage",now.garbage);
-    const due=state.cleaning.filter(c=>!c.next_due||c.next_due<=today);
-    $("today-cleaning-block").hidden=!due.length;
-    $("today-cleaning").innerHTML=due.map(c=>'<div class="task-line">'+esc(c.name)+'</div>').join("");
+    setScheduleTodo("today-todo",scheduleTodoItems(today,now,today));
     const needed=state.shopping.filter(x=>x.needed);
     showOptional("today-shopping",shortSummary(needed,x=>String(x.product||"").trim()));
 
@@ -197,12 +223,14 @@
       ' <span class="muted">／</span> <span class="tomorrow-forecast"><strong>夕</strong> '+weatherPart(next.evening_weather,next.evening_temp_c,next.evening_rain_pct)+'</span>';
     $("tomorrow-schedule").innerHTML=agendaDetails(tomorrow,next,true);
     showOptional("tomorrow-lunch",next.lunch);
-    showOptional("tomorrow-garbage",next.garbage);
+    setScheduleTodo("tomorrow-todo",scheduleTodoItems(tomorrow,next,today));
 
-    const upcoming=Array.from({length:7},(_,i)=>dateAdd(today,i+2))
-      .filter(day=>filledAgendaFields(byDate.get(day)||{}).length>0||holidayName(day));
-    $("future-card").hidden=!upcoming.length;
-    $("schedule-list").innerHTML=upcoming.map(day=>agendaDetails(day,byDate.get(day)||{})).join("");
+    const upcoming=Array.from({length:7},(_,i)=>dateAdd(today,i+2));
+    const displayed=upcoming
+      .map(day=>({day,row:byDate.get(day)||{},todos:scheduleTodoItems(day,byDate.get(day)||{},today)}))
+      .filter(x=>filledAgendaFields(x.row).length>0||holidayName(x.day)||x.todos.length>0);
+    $("future-card").hidden=!displayed.length;
+    $("schedule-list").innerHTML=displayed.map(x=>agendaDetails(x.day,x.row,false,x.todos)).join("");
   }
   function taskSort(a,b){
     const d1=a.due_on||"9999-12-31",d2=b.due_on||"9999-12-31";
