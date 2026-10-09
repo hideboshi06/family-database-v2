@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#f3f7fa">
 <meta name="description" content="Family Database v2 — 家族の予定・給食・掃除・買い物">
 <title>Family Database</title>
-<link rel="stylesheet" href="./styles.css?v=20261009-taskfix">
+<link rel="stylesheet" href="./styles.css?v=20261009-weather-todos">
 </head>
 <body>
 <!-- Compatibility for older cached app.js versions; never shown to the user. -->
@@ -51,13 +51,13 @@
             <span class="daily-key">給食</span>
             <div id="today-lunch" class="daily-value"></div>
           </div>
-          <div class="daily-info" id="today-garbage-block" hidden>
-            <span class="daily-key">ゴミ</span>
-            <div id="today-garbage" class="daily-value"></div>
+          <div class="daily-info" id="today-todo-block" hidden>
+            <span class="daily-key">やること</span>
+            <div id="today-todo" class="daily-value schedule-todo-list"></div>
           </div>
-          <div class="daily-info" id="today-cleaning-block" hidden>
-            <span class="daily-key">掃除</span>
-            <div id="today-cleaning" class="daily-value daily-summary"></div>
+          <div class="legacy-compat" hidden aria-hidden="true">
+            <div id="today-garbage-block"><span id="today-garbage"></span></div>
+            <div id="today-cleaning-block"><span id="today-cleaning"></span></div>
           </div>
           <div class="daily-info" id="today-shopping-block" hidden>
             <span class="daily-key">買い物</span>
@@ -83,9 +83,12 @@
             <span class="daily-key">給食</span>
             <div id="tomorrow-lunch" class="daily-value"></div>
           </div>
-          <div class="daily-info" id="tomorrow-garbage-block" hidden>
-            <span class="daily-key">ゴミ</span>
-            <div id="tomorrow-garbage" class="daily-value"></div>
+          <div class="daily-info" id="tomorrow-todo-block" hidden>
+            <span class="daily-key">やること</span>
+            <div id="tomorrow-todo" class="daily-value schedule-todo-list"></div>
+          </div>
+          <div class="legacy-compat" hidden aria-hidden="true">
+            <div id="tomorrow-garbage-block"><span id="tomorrow-garbage"></span></div>
           </div>
         </div>
       </section>
@@ -196,6 +199,6 @@
 
 <script>window.FD_CONFIG = {url:"https://besevrrmhwmkdqmoiscf.supabase.co",key:"sb_publishable_oo7Bdb8Ip-icb6Y0nqovKg_OH9Taql2"};</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="./app.js?v=20261009-taskfix" defer></script>
+<script src="./app.js?v=20261009-weather-todos" defer></script>
 </body>
 </html>
