@@ -334,3 +334,11 @@ details.help summary{color:var(--navy);cursor:pointer;font-size:12px}
 /* Task registration status stays visible inside the editor instead of disappearing as a toast. */
 #modal-save-status{margin:8px 0 3px;line-height:1.6}
 #modal-save-status.err{font-weight:650}
+
+/* One clear checklist-style reading order for the schedule (no extra cards). */
+.schedule-todo-list{min-width:0}
+.schedule-todo-line{display:block;white-space:pre-line;overflow-wrap:anywhere;font-size:14px;line-height:1.6}
+.schedule-todo-line+.schedule-todo-line{margin-top:4px}
+.future-todo-group{display:grid;grid-template-columns:44px minmax(0,1fr);align-items:start;gap:8px;margin-top:8px}
+.future-todo-label{font-size:12px;color:var(--sub);font-weight:750;padding-top:3px}
+.future-todo-group .schedule-todo-list{min-width:0}
