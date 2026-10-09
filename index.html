@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#f3f7fa">
 <meta name="description" content="Family Database v2 — 家族の予定・給食・掃除・買い物">
 <title>Family Database</title>
-<link rel="stylesheet" href="./styles.css?v=20261009-schedule">
+<link rel="stylesheet" href="./styles.css?v=20261009-uifinal1">
 </head>
 <body>
 <!-- Compatibility for older cached app.js versions; never shown to the user. -->
@@ -33,30 +33,33 @@
 
   <div id="main" hidden>
     <div id="page-dashboard" class="page active">
-      <h1 class="section-page-title">スケジュール</h1>
+      <h1 class="section-page-title"><button type="button" class="schedule-refresh" data-action="reload" title="タップしてページを更新" aria-label="スケジュールを再読み込み">スケジュール <span class="refresh-glyph" aria-hidden="true">↻</span></button></h1>
       <section class="card daily-card today-card" aria-label="今日">
         <div class="daily-header">
-          <button id="today-date" class="daily-date" type="button" data-action="edit-day" title="この日の予定を編集">読み込み中</button>
+          <div class="date-title-row">
+            <button id="today-date" class="daily-date" type="button" data-action="edit-day" title="この日の予定を編集">読み込み中</button>
+            <span id="today-holiday" class="holiday-name" hidden></span>
+          </div>
           <div id="weather-summary" class="daily-weather"></div>
         </div>
         <div class="daily-body">
-          <div class="daily-info">
-            <span class="daily-key">給食</span>
-            <div id="today-lunch" class="daily-value"></div>
-          </div>
-          <div class="daily-info">
-            <span class="daily-key">ゴミ</span>
-            <div id="today-garbage" class="daily-value"></div>
-          </div>
-          <div class="daily-info" id="today-agenda-block" hidden>
+          <div class="daily-info" id="today-agenda-block">
             <span class="daily-key">予定</span>
             <div id="today-schedule" class="daily-value"></div>
           </div>
-          <div class="daily-info">
+          <div class="daily-info" id="today-lunch-block" hidden>
+            <span class="daily-key">給食</span>
+            <div id="today-lunch" class="daily-value"></div>
+          </div>
+          <div class="daily-info" id="today-garbage-block" hidden>
+            <span class="daily-key">ゴミ</span>
+            <div id="today-garbage" class="daily-value"></div>
+          </div>
+          <div class="daily-info" id="today-cleaning-block" hidden>
             <span class="daily-key">掃除</span>
             <div id="today-cleaning" class="daily-value daily-summary"></div>
           </div>
-          <div class="daily-info">
+          <div class="daily-info" id="today-shopping-block" hidden>
             <span class="daily-key">買い物</span>
             <div id="today-shopping" class="daily-value daily-summary"></div>
           </div>
@@ -65,21 +68,24 @@
 
       <section class="card daily-card tomorrow-card" aria-label="明日">
         <div class="daily-header">
-          <button id="tomorrow-title" class="daily-date" type="button" data-action="edit-day" title="この日の予定を編集">読み込み中</button>
+          <div class="date-title-row">
+            <button id="tomorrow-title" class="daily-date" type="button" data-action="edit-day" title="この日の予定を編集">読み込み中</button>
+            <span id="tomorrow-holiday" class="holiday-name" hidden></span>
+          </div>
           <div id="tomorrow-weather" class="daily-weather tomorrow-weather"></div>
         </div>
         <div class="daily-body">
-          <div class="daily-info">
+          <div class="daily-info" id="tomorrow-agenda-block">
+            <span class="daily-key">予定</span>
+            <div id="tomorrow-schedule" class="daily-value"></div>
+          </div>
+          <div class="daily-info" id="tomorrow-lunch-block" hidden>
             <span class="daily-key">給食</span>
             <div id="tomorrow-lunch" class="daily-value"></div>
           </div>
-          <div class="daily-info">
+          <div class="daily-info" id="tomorrow-garbage-block" hidden>
             <span class="daily-key">ゴミ</span>
             <div id="tomorrow-garbage" class="daily-value"></div>
-          </div>
-          <div class="daily-info" id="tomorrow-agenda-block" hidden>
-            <span class="daily-key">予定</span>
-            <div id="tomorrow-schedule" class="daily-value"></div>
           </div>
         </div>
       </section>
@@ -178,6 +184,6 @@
 
 <script>window.FD_CONFIG = {url:"https://besevrrmhwmkdqmoiscf.supabase.co",key:"sb_publishable_oo7Bdb8Ip-icb6Y0nqovKg_OH9Taql2"};</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="./app.js?v=20261009-schedule" defer></script>
+<script src="./app.js?v=20261009-uifinal1" defer></script>
 </body>
 </html>
