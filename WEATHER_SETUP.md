@@ -1,9 +1,9 @@
 # 天気自動更新の移行ガイド
 
-Family Database v2の天気更新は、**毎朝5:00 日本時間** に Supabase Cron → Edge Function → WeatherAPI.com → `public.daily` の順番で動きます。
+Family Database v2の天気更新は、**毎日5:00・11:00・17:00・23:00 日本時間（6時間ごと）** に Supabase Cron → Edge Function → WeatherAPI.com → `public.daily` の順番で動きます。
 
 - Edge Function: `family-weather-update` （デプロイ済み、verify_jwt = false・共有トークン認証）
-- Cron: `family-weather-daily-0500-jst` （20:00 UTC、登録済み。旧5:35のジョブは解除済み）
+- Cron: `family-weather-four-times-jst` （UTC 02:00・08:00・14:00・20:00、JST 11:00・17:00・23:00・翌05:00。旧5:00のみのジョブは解除済み）
 - 予報: 今日から最大3日分、朝8:00と夕方18:00、気温・降水確率・天候（日本語）
 - **旧GASの自動更新は切り替えが確認できるまで停止しないでください**。
 
@@ -28,7 +28,7 @@ SQL Editor:
 ```sql
 select jobname,schedule,active
 from cron.job
-where jobname='family-weather-daily-0500-jst';
+where jobname='family-weather-four-times-jst';
 
 -- Secretsの有無だけ確認。値そのものは表示しない。
 select name from vault.decrypted_secrets where name='family_weather_cron_token';
@@ -46,6 +46,6 @@ Cron実行ログは Supabase Dashboard → Integrations → Cron または `cron
 ## 動作状況・作業残
 
 - 2026-10-08 にSecret登録・手動実行・HTTP 200・予報3日分保存を確認済み。
-- 2026-10-08 に毎朝5:35から毎朝5:00 JSTへ変更済み。
+- 2026-10-08 に毎朝5:35から毎朝5:00 JSTへ変更。2026-10-09 に毎日5:00・11:00・17:00・23:00 JSTへ変更済み。
 - 翌朝の定期実行結果を確認する。
 - 旧GASの通知・スプレッドシートとのデータ切り替えは別途判断する。
