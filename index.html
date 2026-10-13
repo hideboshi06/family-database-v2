@@ -9,7 +9,7 @@
 <link rel="manifest" href="./manifest.webmanifest">
 <meta name="description" content="Family Database v2 — 家族の予定・給食・掃除・買い物">
 <title>Family Database</title>
-<link rel="stylesheet" href="./styles.css?v=20261013-local-push-test">
+<link rel="stylesheet" href="./styles.css?v=20261013-notification-time">
 </head>
 <body>
 <!-- Compatibility for older cached app.js versions; never shown to the user. -->
@@ -188,6 +188,15 @@
       <section class="card" id="settings-push-test" hidden>
         <h2>🧪 テスト通知（管理者のみ）</h2>
         <p class="small">今日のSupabaseのデータから通知を作成します。まずはこの端末の通知表示と、タップでスケジュールが開くことを確認します。</p>
+        <div class="notification-time-setting">
+          <label class="field" for="notification-time">毎朝の通知時刻（日本時間）</label>
+          <div class="notification-time-controls">
+            <input class="input" id="notification-time" type="time" value="05:30" step="60" aria-describedby="notification-time-description">
+            <button class="btn secondary smallbtn" id="save-notification-time" type="button" data-action="save-notification-time">時刻を保存</button>
+          </div>
+          <p id="notification-time-status" class="small" role="status" aria-live="polite">保存済みの時刻を確認しています…</p>
+          <p id="notification-time-description" class="tiny">この時刻は家族全員への将来の配信用設定です。現在は保存のみで、自動配信は始まりません。</p>
+        </div>
         <p id="push-test-status" class="small" role="status" aria-live="polite">通知の状態を確認しています…</p>
         <div class="push-test-actions">
           <button type="button" class="btn secondary smallbtn" data-action="enable-test-notifications">通知を許可</button>
@@ -217,6 +226,6 @@
 
 <script>window.FD_CONFIG = {url:"https://besevrrmhwmkdqmoiscf.supabase.co",key:"sb_publishable_oo7Bdb8Ip-icb6Y0nqovKg_OH9Taql2"};</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="./app.js?v=20261013-local-push-test" defer></script>
+<script src="./app.js?v=20261013-notification-time" defer></script>
 </body>
 </html>
