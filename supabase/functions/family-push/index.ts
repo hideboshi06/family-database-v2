@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { generateVapidKey, vapidPublicKey, send } from "jsr:@daaku/webpush@0.2.0";
+import { send } from "jsr:@daaku/webpush@0.2.0";
 
 const SITE="https://hideboshi06.github.io/family-database-v2/";
 const ORIGIN="https://hideboshi06.github.io";
@@ -15,13 +15,35 @@ const nowJST=()=>{
 };
 type DB=ReturnType<typeof createClient>;
 type Subscription={endpoint:string;user_id:string;p256dh:string;auth:string};
+// Construct VAPID from the standards-based WebCrypto P-256 key pair instead of
+// relying on the Web Push package's key generation helper in the Edge runtime.
+function decodeB64Url(raw:string){
+ const s=raw.replace(/-/g,"+").replace(/_/g,"/");
+ return Uint8Array.from(atob(s.padEnd(Math.ceil(s.length/4)*4,"=")),x=>x.charCodeAt(0));
+}
+function encodeB64Url(raw:Uint8Array){
+ let binary="";
+ for(const byte of raw)binary+=String.fromCharCode(byte);
+ return btoa(binary).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/u,"");
+}
 async function keys(db:DB){
  const saved=get(await db.from("push_vapid_keys").select("private_jwk,public_key").eq("id",1).maybeSingle());
  if(saved)return saved as {private_jwk:JsonWebKey,public_key:string};
- const privateKey=await generateVapidKey();
- const publicKey=await vapidPublicKey(privateKey);
+ console.log("Family push VAPID key generation started");
+ const pair=await crypto.subtle.generateKey(
+  {name:"ECDSA",namedCurve:"P-256"},true,["sign","verify"]
+ ) as CryptoKeyPair;
+ const privateKey=await crypto.subtle.exportKey("jwk",pair.privateKey);
+ if(!privateKey.x||!privateKey.y||!privateKey.d)throw Error("vapid_key_export_incomplete");
+ const x=decodeB64Url(privateKey.x),y=decodeB64Url(privateKey.y);
+ if(x.length!==32||y.length!==32)throw Error("vapid_public_key_invalid");
+ const point=new Uint8Array(65);
+ point[0]=4;point.set(x,1);point.set(y,33);
+ const publicKey=encodeB64Url(point);
  get(await db.from("push_vapid_keys").upsert({id:1,private_jwk:privateKey,public_key:publicKey},{onConflict:"id",ignoreDuplicates:true}));
- return get(await db.from("push_vapid_keys").select("private_jwk,public_key").eq("id",1).single()) as {private_jwk:JsonWebKey,public_key:string};
+ const stored=get(await db.from("push_vapid_keys").select("private_jwk,public_key").eq("id",1).single());
+ console.log("Family push VAPID public key ready");
+ return stored as {private_jwk:JsonWebKey,public_key:string};
 }
 function endpointValid(endpoint:string){
  try{
@@ -144,7 +166,7 @@ Deno.serve(async(req:Request)=>{
   }
   return json(400,{error:"unknown_action"});
  }catch(err){
-  console.error("Family push delivery error",err instanceof Error?err.name:"unknown");
+  console.error("Family push delivery error",err instanceof Error?err.name+": "+err.message:"unknown");
   return json(500,{error:"push_handler_failed"});
  }
 });
