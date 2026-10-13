@@ -9,7 +9,7 @@
 <link rel="manifest" href="./manifest.webmanifest">
 <meta name="description" content="Family Database v2 — 家族の予定・給食・掃除・買い物">
 <title>Family Database</title>
-<link rel="stylesheet" href="./styles.css?v=20261013-webpush">
+<link rel="stylesheet" href="./styles.css?v=20261013-notification-settings">
 </head>
 <body>
 <!-- Compatibility for older cached app.js versions; never shown to the user. -->
@@ -175,15 +175,37 @@
         <p id="settings-user" style="overflow-wrap:anywhere"></p>
         <p class="notice">閲覧・編集権限はGoogleログインとSupabaseのアクセス制限（RLS）で管理しています。</p>
       </section>
-      <section class="card" id="settings-push-device">
-        <h2>🔔 プッシュ通知の受信</h2>
-        <p class="small">この端末を登録すると、Family Databaseを閉じていても通知を受け取れます。</p>
-        <p id="push-device-status" class="small" role="status" aria-live="polite">端末の登録状態を確認しています…</p>
-        <div class="push-test-actions">
-          <button class="btn smallbtn" type="button" id="register-push-device" data-action="register-push-device">この端末で受信を有効にする</button>
-          <button class="btn secondary smallbtn" type="button" data-action="remove-push-device">端末の登録を解除</button>
+      <section class="card" id="settings-notifications">
+        <h2>🔔 通知設定</h2>
+        <p class="small">毎朝、Supabaseに登録した今日の家族予定をお知らせします。通知をタップするとスケジュールが開きます。</p>
+        <div class="notification-section">
+          <h3>この端末の受信設定</h3>
+          <p class="small" id="push-device-status" role="status" aria-live="polite">登録状態を確認しています…</p>
+          <div class="notification-actions">
+            <button type="button" class="btn smallbtn" id="register-push-device" data-action="register-push-device">この端末で受信を有効にする</button>
+            <button type="button" class="btn secondary smallbtn" data-action="remove-push-device">この端末の登録を解除</button>
+          </div>
+          <p class="tiny">家族それぞれのiPhoneで、ホーム画面に追加したFamily Databaseから一度ずつ登録してください。</p>
         </div>
-        <p class="tiny">各家族のiPhoneで、ホーム画面に追加したFamily Databaseから一度ずつ登録してね。</p>
+        <div id="notification-admin-controls" hidden>
+          <div class="notification-section">
+            <h3>通知時刻 <span class="small">（管理者のみ）</span></h3>
+            <label class="field" for="notification-time">毎朝の配信時刻（日本時間）</label>
+            <div class="notification-time-controls">
+              <input class="input" id="notification-time" type="time" value="05:30" step="60">
+              <button type="button" class="btn secondary smallbtn" id="save-notification-time" data-action="save-notification-time">時刻を保存</button>
+            </div>
+            <p class="small" id="notification-time-status" role="status" aria-live="polite">配信時刻を確認しています…</p>
+          </div>
+          <div class="notification-section">
+            <div class="between notification-auto-heading">
+              <h3>家族全員への自動配信</h3>
+              <button type="button" class="btn secondary smallbtn" id="push-auto-toggle" data-action="toggle-push-auto" data-enabled="false">自動配信を開始</button>
+            </div>
+            <p class="small" id="push-auto-status" role="status" aria-live="polite">配信状態を確認しています…</p>
+            <p class="tiny">自動配信を開始すると、通知を許可した家族の登録端末へ、設定時刻に今日の予定を一斉配信します。</p>
+          </div>
+        </div>
       </section>
       <section class="card" id="settings-admin" hidden>
         <h2>家族アカウント管理</h2>
@@ -194,34 +216,6 @@
           <input type="email" id="member-email" name="email" class="input" placeholder="example@gmail.com" autocomplete="off" required>
           <button type="submit" class="btn full" style="margin-top:10px">家族を追加</button>
         </form>
-      </section>
-      <section class="card" id="settings-push-test" hidden>
-        <h2>🧪 テスト通知（管理者のみ）</h2>
-        <p class="small">今日のSupabaseのデータから通知を作成します。まずはこの端末の通知表示と、タップでスケジュールが開くことを確認します。</p>
-        <div class="notification-time-setting">
-          <label class="field" for="notification-time">毎朝の通知時刻（日本時間）</label>
-          <div class="notification-time-controls">
-            <input class="input" id="notification-time" type="time" value="05:30" step="60" aria-describedby="notification-time-description">
-            <button class="btn secondary smallbtn" id="save-notification-time" type="button" data-action="save-notification-time">時刻を保存</button>
-          </div>
-          <p id="notification-time-status" class="small" role="status" aria-live="polite">保存済みの時刻を確認しています…</p>
-          <p id="notification-time-description" class="tiny">家族全員への自動配信にこの時刻を使用します。開始・停止は下のスイッチで管理できます。</p>
-        </div>
-        <div class="notification-time-setting">
-          <div class="between">
-            <strong>家族全員への自動配信</strong>
-            <button type="button" class="btn secondary smallbtn" id="push-auto-toggle" data-action="toggle-push-auto" data-enabled="false">自動配信を開始</button>
-          </div>
-          <p class="small" id="push-auto-status" role="status" aria-live="polite">停止中。サーバーからのテスト後に開始できます。</p>
-          <p class="tiny">設定した日本時間に毎日一斉配信します。アプリを閉じた状態でのサーバー送信テストを確認してから開始してください。</p>
-        </div>
-        <p id="push-test-status" class="small" role="status" aria-live="polite">通知の状態を確認しています…</p>
-        <div class="push-test-actions">
-          <button type="button" class="btn secondary smallbtn" data-action="enable-test-notifications">通知を許可</button>
-          <button type="button" class="btn secondary smallbtn" data-action="send-local-test-notification">画面からテスト通知</button>
-          <button type="button" class="btn smallbtn" id="send-remote-push-test" data-action="send-remote-push-test">サーバーからテスト送信</button>
-        </div>
-        <p class="small" id="push-remote-status" role="status" aria-live="polite">サーバーのテスト送信先は管理者本人の登録端末だけです。</p>
       </section>
     </div>
     <p class="status" id="page-status" role="status" aria-live="polite"></p>
@@ -245,6 +239,6 @@
 
 <script>window.FD_CONFIG = {url:"https://besevrrmhwmkdqmoiscf.supabase.co",key:"sb_publishable_oo7Bdb8Ip-icb6Y0nqovKg_OH9Taql2"};</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="./app.js?v=20261013-webpush-sendfix-keyfix" defer></script>
+<script src="./app.js?v=20261013-notification-settings" defer></script>
 </body>
 </html>
