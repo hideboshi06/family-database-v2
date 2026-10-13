@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { send } from "jsr:@daaku/webpush@0.2.0";
+import { send, encrypt } from "jsr:@daaku/webpush@0.2.0";
 
 const SITE="https://hideboshi06.github.io/family-database-v2/";
 const ORIGIN="https://hideboshi06.github.io";
@@ -117,7 +117,7 @@ Deno.serve(async(req:Request)=>{
   const db=createClient(url,serviceKey,{auth:{persistSession:false,autoRefreshToken:false}});
   const input=await req.json() as {action?:string;enabled?:boolean},action=str(input?.action);
   let signedIn:{id:string;role:string}|null=null;
-  if(action==="scheduled"||action==="self-test"){
+  if(action==="scheduled"||action==="self-test"||action==="self-crypto-test"){
    const token=req.headers.get("x-family-push-cron")||"";
    if(!token)return json(401,{error:"missing_cron_credential"});
    if(!get(await db.rpc("verify_family_push_cron",{candidate:token})))return json(403,{error:"invalid_cron_credential"});
@@ -132,6 +132,24 @@ Deno.serve(async(req:Request)=>{
    if(!member)return json(403,{error:"family_only"});
    signedIn={id:u.id,role:member.role};
    if(["send-test","set-delivery"].includes(action)&&member.role!=="admin")return json(403,{error:"admin_only"});
+  }
+  if(action==="self-crypto-test"){
+   const subs=get(await db.rpc("active_family_push_subscriptions")) as Subscription[];
+   if(!subs.length)return json(409,{ok:false,error:"no_registered_device"});
+   try{
+    const vapid=await keys(db);
+    const demo={title:"Encryption dry run",body:"No actual push is sent",url:SITE};
+    const request=await encrypt(
+     {endpoint:subs[0].endpoint,keys:{p256dh:subs[0].p256dh,auth:subs[0].auth}},
+     JSON.stringify(demo),
+     {vapid:vapid.private_jwk,subscriber:SITE,ttl:60,urgency:"normal"}
+    );
+    return json(200,{ok:true,stage:"encrypted",bodyBytes:request.body.byteLength});
+   }catch(e){
+    console.warn("Web Push encryption diagnostic failed",e instanceof Error?e.name:"unknown");
+    return json(422,{ok:false,stage:"encryption",kind:e instanceof Error?e.name:"unknown",
+      detail:e instanceof Error?e.message.slice(0,250):"unknown"});
+   }
   }
   if(action==="self-test")return json(200,{ok:true,publicKeyValid:(await keys(db)).public_key.length===87});
   if(action==="public-key")return json(200,{publicKey:(await keys(db)).public_key});
