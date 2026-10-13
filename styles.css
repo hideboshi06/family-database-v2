@@ -368,3 +368,9 @@ details.help summary{color:var(--navy);cursor:pointer;font-size:12px}
 .notification-time-controls .btn{min-height:43px}
 .notification-time-setting .small{margin:9px 0 5px;overflow-wrap:anywhere}
 .notification-time-setting .tiny{line-height:1.6;margin:6px 0}
+
+/* PWA Web Push device enrollment and dispatch controls. */
+#settings-push-device .small,#settings-push-device .tiny{line-height:1.65}
+#settings-push-device .small{margin:9px 0}
+#settings-push-device .tiny{margin:5px 0}
+#push-auto-status,#push-remote-status{overflow-wrap:anywhere}
