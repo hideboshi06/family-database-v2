@@ -140,7 +140,7 @@
     add("掃除",dueCleaningToday(today).join("、"));
     add("タスク",dueTasksToday(today).join("、"));
     add("買い物",shoppingToday().join("、"));
-    return rows.join("\\n").slice(0,950)||"今日は登録されている予定がありません。";
+    return rows.join(String.fromCharCode(10)).slice(0,950)||"今日は登録されている予定がありません。";
   }
   async function showLocalTestNotification(){
     checkLocalPushReady();
