@@ -194,6 +194,9 @@
       $("push-remote-status").textContent="送信結果：成功 "+r.sent+"台 / 失敗 "+r.failed+"台";
       if(!r.sent)throw Error("送信できませんでした。端末の登録状態を確認してください");
       toast("サーバーからテスト通知を送信したよ！");
+    }catch(e){
+      $("push-remote-status").textContent="テスト送信エラー: "+errorText(e);
+      throw e;
     }finally{button.disabled=false;}
   }
   async function toggleAutomaticPush(){
