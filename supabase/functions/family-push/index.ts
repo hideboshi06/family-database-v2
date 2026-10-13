@@ -113,7 +113,7 @@ Deno.serve(async(req:Request)=>{
   const db=createClient(url,serviceKey,{auth:{persistSession:false,autoRefreshToken:false}});
   const input=await req.json() as {action?:string;enabled?:boolean},action=str(input?.action);
   let signedIn:{id:string;role:string}|null=null;
-  if(action==="scheduled"){
+  if(action==="scheduled"||action==="self-test"){
    const token=req.headers.get("x-family-push-cron")||"";
    if(!token)return json(401,{error:"missing_cron_credential"});
    if(!get(await db.rpc("verify_family_push_cron",{candidate:token})))return json(403,{error:"invalid_cron_credential"});
@@ -129,6 +129,7 @@ Deno.serve(async(req:Request)=>{
    signedIn={id:u.id,role:member.role};
    if(["send-test","set-delivery"].includes(action)&&member.role!=="admin")return json(403,{error:"admin_only"});
   }
+  if(action==="self-test")return json(200,{ok:true,publicKeyValid:(await keys(db)).public_key.length===87});
   if(action==="public-key")return json(200,{publicKey:(await keys(db)).public_key});
   if(action==="send-test"&&signedIn){
    const list=get(await db.rpc("active_family_push_subscriptions")) as Subscription[];
