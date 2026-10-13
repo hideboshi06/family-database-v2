@@ -107,7 +107,7 @@
   async function saveNotificationTime(){
     if(state.role!=="admin")throw Error("管理者専用の設定です");
     const input=$("notification-time"),time=String(input.value||"");
-    if(!/^(?:[01]\\d|2[0-3]):[0-5]\\d$/.test(time))
+    if(!/^[0-2][0-9]:[0-5][0-9]$/.test(time)||Number(time.slice(0,2))>23)
       throw Error("通知時刻を正しく入力してください");
     const button=$("save-notification-time");
     if(button.disabled)return;
