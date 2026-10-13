@@ -10,8 +10,8 @@ const binaryClass=Uint8Array as typeof Uint8Array & {
 if(typeof binaryClass.fromBase64!=="function"){
  Object.defineProperty(binaryClass,"fromBase64",{configurable:true,value:(input:string,options?:{alphabet?:"base64"|"base64url"})=>{
   if(typeof input!=="string")throw new TypeError("Expected Base64 string");
-  let encoded=input.replace(/[ \\t\\n\\r\\f]/g,"");
-  if(options?.alphabet==="base64url")encoded=encoded.replace(/-/g,"+").replace(/_/g,"/");
+  let encoded=input.replace(/[ \t\n\r\f]/g,"");
+  encoded=encoded.replace(/-/g,"+").replace(/_/g,"/");
   if(!/^[a-zA-Z0-9+/]*={0,2}$/.test(encoded)||encoded.length%4===1)
    throw new SyntaxError("Invalid Base64 input");
   const binary=atob(encoded.padEnd(Math.ceil(encoded.length/4)*4,"="));
@@ -28,7 +28,7 @@ if(typeof binaryPrototype.toBase64!=="function"){
   let raw="";
   for(const value of this)raw+=String.fromCharCode(value);
   let out=btoa(raw);
-  if(options?.alphabet==="base64url")out=out.replace(/\\+/g,"-").replace(/\\//g,"_");
+  if(options?.alphabet==="base64url")out=out.replace(/\+/g,"-").replace(/\//g,"_");
   if(options?.omitPadding)out=out.replace(/=+$/,"");
   return out;
  }});
