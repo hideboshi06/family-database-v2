@@ -369,3 +369,17 @@ details.help summary{color:var(--navy);cursor:pointer;font-size:12px}
 .notification-auto-heading h3{margin:0!important;min-width:0}
 .notification-auto-heading .btn{flex-shrink:0}
 @media (max-width:370px){.notification-auto-heading{align-items:flex-start;flex-direction:column}}
+
+/* Tiny external webpage affordance, attached only to agenda text with a URL. */
+.schedule-text .agenda-hp-link{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:22px;height:22px;margin-left:4px;vertical-align:middle;
+  border-radius:6px;background:var(--navylight);color:var(--navy);
+  font-size:14px;font-weight:800;line-height:1;text-decoration:none;white-space:nowrap;
+}
+.schedule-text .agenda-hp-link:focus-visible{outline:2px solid var(--navy);outline-offset:2px}
+.agenda-url-editor{margin:16px 0 2px;padding:9px 10px;border:1px solid var(--line);border-radius:9px;background:var(--light)}
+.agenda-url-editor summary{cursor:pointer;color:var(--navy);font-size:12px;font-weight:750;list-style-position:inside}
+.agenda-url-fields{padding:5px 0 3px}
+.agenda-url-fields .field{font-size:11px;margin-top:9px}
+.agenda-url-fields .agenda-url-input{min-height:39px;font-size:13px}
