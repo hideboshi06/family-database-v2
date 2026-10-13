@@ -268,8 +268,45 @@
     renderDashboard();renderTodo();
     $("page-status").textContent="Supabase接続中 · "+new Date().toLocaleTimeString("ja-JP",{timeZone:"Asia/Tokyo",hour:"2-digit",minute:"2-digit"})+" 読込";
   }
-  function line(label,value){
-    return value?'<div class="scheduleline"><span class="who">'+esc(label)+'</span><span class="schedule-text">'+esc(value)+'</span></div>':"";
+  const agendaUrlField=k=>k+"_url";
+  function safeAgendaHref(value){
+    const input=String(value||"").trim();
+    if(!input)return "";
+    try{
+      const url=new URL(input);
+      if(!["http:","https:"].includes(url.protocol)||!url.hostname||url.username||url.password)return "";
+      return url.href;
+    }catch{return "";}
+  }
+  function normalizeAgendaUrl(input,label){
+    const raw=String(input||"").trim();
+    if(!raw)return null;
+    if(raw.length>2048)throw Error(label+"のHPリンクは2048文字以内にしてね");
+    if(!/^(?:https?:\/\/)/i.test(raw)&&/^[a-z][a-z0-9+.-]*:/i.test(raw))
+      throw Error(label+"のHPリンクはhttpかhttpsのURLを入力してね");
+    const candidate=/^https?:\/\//i.test(raw)?raw:"https://"+raw;
+    const href=safeAgendaHref(candidate);
+    if(!href||href.length>2048||/[\s<>]/.test(raw))
+      throw Error(label+"のHPリンクを確認してね（例: https://example.com）");
+    return href;
+  }
+  function agendaHpIcon(label,value){
+    const href=safeAgendaHref(value);
+    if(!href)return "";
+    return '<a class="agenda-hp-link" href="'+esc(href)+'" target="_blank" rel="noopener noreferrer" aria-label="'+esc(label)+'のHPを開く" title="'+esc(label)+'のHPを開く">↗</a>';
+  }
+  function agendaUrlEditor(getValue,day){
+    const current=fields.some(k=>String(getValue(agendaUrlField(k))||"").trim());
+    const inMonth=!!day;
+    const inputs=fields.map(k=>{
+      const urlKey=agendaUrlField(k);
+      const attrs=inMonth?' data-month-field="'+urlKey+'" data-day="'+esc(day)+'"':' name="'+urlKey+'"';
+      return '<label class="field">'+person[k]+'のHP</label><input class="input agenda-url-input" type="text" inputmode="url" autocomplete="off" spellcheck="false" maxlength="2048" placeholder="https://..."'+attrs+' value="'+esc(getValue(urlKey)||"")+'">';
+    }).join("");
+    return '<details class="agenda-url-editor"'+(current?' open':'')+'><summary>🔗 HPリンクを設定（任意）</summary><div class="agenda-url-fields">'+inputs+'</div></details>';
+  }
+  function line(label,value,url){
+    return value?'<div class="scheduleline"><span class="who">'+esc(label)+'</span><span class="schedule-text">'+esc(value)+agendaHpIcon(label,url)+'</span></div>':"";
   }
   function weatherEmoji(condition){
     const text=String(condition||"").trim();
@@ -306,7 +343,7 @@
     return fields.filter(k=>row[k]&&String(row[k]).trim());
   }
   function agendaDetails(day,row,compact=false){
-    const lines=filledAgendaFields(row).map(k=>line(person[k],row[k])).join("");
+    const lines=filledAgendaFields(row).map(k=>line(person[k],row[k],row[agendaUrlField(k)])).join("");
     return '<div class="dayrow'+(compact?' dayrow-inline':'')+'">'+
       (compact?"":'<button type="button" data-action="edit-day" data-day="'+day+'" class="daydate '+weekend(day)+'">'+fmtDay(day)+(holidayName(day)?' <span class="holiday-name">'+esc(holidayName(day))+'</span>':"")+'</button>')+
       '<div class="daycontent">'+(lines||'<div class="empty">予定なし</div>')+'</div></div>';
@@ -314,7 +351,7 @@
   // Today/tomorrow use the same two-column person labels as the future agenda.
   // No outer "予定" row, so entries line up with lunch and garbage.
   function renderDailyAgenda(id,row){
-    const lines=filledAgendaFields(row).map(k=>line(person[k],row[k])).join("");
+    const lines=filledAgendaFields(row).map(k=>line(person[k],row[k],row[agendaUrlField(k)])).join("");
     $(id).innerHTML=lines||line("予定","なし");
   }
   // Keep persisted item names untouched: cleaning suffixes are display-only.
@@ -450,7 +487,8 @@
     let row=state.daily.find(x=>x.day===day);
     if(!row)row=check(await state.client.from("daily").select("*").eq("day",day).maybeSingle())||{};
     const html='<form id="modal-form" data-kind="day"><input type="hidden" name="day" value="'+esc(day)+'">'+
-      fields.map(k=>'<label class="field">'+person[k]+'</label><textarea name="'+k+'" rows="2">'+esc(row[k]||"")+'</textarea>').join("")+'</form>';
+      fields.map(k=>'<label class="field">'+person[k]+'</label><textarea name="'+k+'" rows="2">'+esc(row[k]||"")+'</textarea>').join("")+
+      agendaUrlEditor(key=>row[key])+'</form>';
     modal(fmtDay(day)+" の予定",html,actions());
   }
   async function editShopping(id){
@@ -611,7 +649,10 @@
     let savedTaskId=null;
     try{
       if(kind==="day"){
-        const data={};fields.forEach(k=>data[k]=String(fd.get(k)||"").trim()||null);
+        const data={};fields.forEach(k=>{
+          data[k]=String(fd.get(k)||"").trim()||null;
+          data[agendaUrlField(k)]=normalizeAgendaUrl(fd.get(agendaUrlField(k)),person[k]);
+        });
         await updateDay(String(fd.get("day")),data);
         state.monthCache=null;
       }else if(kind==="task"){
