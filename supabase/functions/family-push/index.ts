@@ -94,7 +94,11 @@ async function broadcast(db:DB,list:Subscription[],test=false){
     expired++;
     await db.from("push_subscriptions").delete().eq("endpoint",sub.endpoint);
    }
-   console.warn("Web Push provider status",error.statusCode||"unknown");
+   // Do not log endpoints, subscription encryption keys or JWK private material.
+   // Preserve provider status and crypto error name so failures can be diagnosed.
+   const errorKind=e instanceof Error?e.name:"unknown";
+   const safeMessage=e instanceof Error?e.message.slice(0,180):"not_an_error";
+   console.warn("Web Push send failed",error.statusCode||"none",errorKind,safeMessage);
   }
  }
  return {sent,failed,expired,devices:list.length};
