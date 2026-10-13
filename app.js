@@ -52,7 +52,13 @@
     document.querySelectorAll(".tabbar [data-tab]").forEach(el=>el.classList.toggle("active",el.dataset.tab===(page==="month"?"dashboard":page)));
     if(page==="month"){renderMonth();loadMonth().catch(e=>report(e,"月間読込: "));}
     if(page==="todo")renderTodo();
-    if(page==="settings")loadMembers().catch(e=>report(e,"メンバー読込: "));
+    if(page==="settings"){
+      loadMembers().catch(e=>report(e,"メンバー読込: "));
+      if(state.role==="admin")loadNotificationSettings().catch(e=>{
+        $("notification-time-status").textContent="時刻の読み込みに失敗しました: "+errorText(e);
+        report(e,"通知設定読込: ");
+      });
+    }
     scrollTo(0,0);
   }
   async function init(){
@@ -87,6 +93,42 @@
       await refresh();
     }catch(e){
       show("login");$("login-error").textContent="ログイン確認: "+errorText(e);$("login-error").hidden=false;
+    }
+  }
+  async function loadNotificationSettings(){
+    if(state.role!=="admin")return;
+    const row=check(await state.client.from("notification_settings")
+      .select("send_time,delivery_enabled").eq("id",1).single());
+    const time=String(row.send_time||"05:30").slice(0,5);
+    $("notification-time").value=time;
+    $("notification-time-status").textContent="保存済み: "+time+"（日本時間） / "+
+      (row.delivery_enabled?"自動配信は有効":"自動配信は未開始");
+  }
+  async function saveNotificationTime(){
+    if(state.role!=="admin")throw Error("管理者専用の設定です");
+    const input=$("notification-time"),time=String(input.value||"");
+    if(!/^(?:[01]\\d|2[0-3]):[0-5]\\d$/.test(time))
+      throw Error("通知時刻を正しく入力してください");
+    const button=$("save-notification-time");
+    if(button.disabled)return;
+    button.disabled=true;
+    button.textContent="保存中…";
+    $("notification-time-status").textContent="通知時刻を保存しています…";
+    try{
+      // The DB grants administrators UPDATE on send_time only, not delivery_enabled.
+      const saved=check(await state.client.from("notification_settings")
+        .update({send_time:time+":00"}).eq("id",1).select("send_time,delivery_enabled").single());
+      if(String(saved.send_time||"").slice(0,5)!==time)
+        throw Error("保存結果の確認に失敗しました");
+      $("notification-time-status").textContent="保存済み: "+time+"（日本時間） / "+
+        (saved.delivery_enabled?"自動配信は有効":"自動配信は未開始");
+      toast("通知時刻を"+time+"に保存したよ！");
+    }catch(e){
+      $("notification-time-status").textContent="保存できませんでした: "+errorText(e);
+      report(e,"通知時刻: ");
+    }finally{
+      button.disabled=false;
+      button.textContent="時刻を保存";
     }
   }
   function refreshPushTestStatus(){
@@ -571,6 +613,7 @@
       if(a==="refresh"){await refresh();toast("更新したよ！");}
       if(a==="enable-test-notifications")await enableLocalNotifications();
       if(a==="send-local-test-notification")await showLocalTestNotification();
+      if(a==="save-notification-time")await saveNotificationTime();
       if(a==="save-modal"){
         const form=$("modal-form");
         if(!form)throw Error("入力画面が見つかりません");
