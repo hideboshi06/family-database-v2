@@ -359,3 +359,12 @@ details.help summary{color:var(--navy);cursor:pointer;font-size:12px}
 .push-test-actions{display:flex;flex-wrap:wrap;gap:9px;margin:12px 0}
 #settings-push-test .small{line-height:1.65}
 #settings-push-test .tiny{line-height:1.6}
+
+/* Administrator-controlled morning delivery preference; no automatic push is started. */
+.notification-time-setting{padding:12px 0 9px;margin:6px 0 12px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.notification-time-setting .field{display:block;margin:0 0 8px}
+.notification-time-controls{display:flex;align-items:center;flex-wrap:wrap;gap:9px}
+.notification-time-controls .input{width:145px;max-width:100%;min-width:0;font-size:16px}
+.notification-time-controls .btn{min-height:43px}
+.notification-time-setting .small{margin:9px 0 5px;overflow-wrap:anywhere}
+.notification-time-setting .tiny{line-height:1.6;margin:6px 0}
