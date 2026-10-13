@@ -53,6 +53,7 @@
     if(page==="month"){renderMonth();loadMonth().catch(e=>report(e,"月間読込: "));}
     if(page==="todo")renderTodo();
     if(page==="settings"){
+      refreshPushDeviceStatus().catch(e=>report(e,"受信端末: "));
       loadMembers().catch(e=>report(e,"メンバー読込: "));
       if(state.role==="admin")loadNotificationSettings().catch(e=>{
         $("notification-time-status").textContent="時刻の読み込みに失敗しました: "+errorText(e);
@@ -211,8 +212,13 @@
       .select("send_time,delivery_enabled").eq("id",1).single());
     const time=String(row.send_time||"05:30").slice(0,5);
     $("notification-time").value=time;
-    $("notification-time-status").textContent="保存済み: "+time+"（日本時間） / "+
-      (row.delivery_enabled?"自動配信は有効":"自動配信は未開始");
+    $("notification-time-status").textContent="保存済み: "+time+"（日本時間）";
+    const toggle=$("push-auto-toggle");
+    toggle.dataset.enabled=String(!!row.delivery_enabled);
+    toggle.textContent=row.delivery_enabled?"自動配信を停止":"自動配信を開始";
+    $("push-auto-status").textContent=row.delivery_enabled
+      ?"自動配信中：毎朝"+time+"（日本時間）"
+      :"自動配信は停止中。サーバーからの受信テスト後に開始してください。";
   }
   async function saveNotificationTime(){
     if(state.role!=="admin")throw Error("管理者専用の設定です");
@@ -230,8 +236,7 @@
         .update({send_time:time+":00"}).eq("id",1).select("send_time,delivery_enabled").single());
       if(String(saved.send_time||"").slice(0,5)!==time)
         throw Error("保存結果の確認に失敗しました");
-      $("notification-time-status").textContent="保存済み: "+time+"（日本時間） / "+
-        (saved.delivery_enabled?"自動配信は有効":"自動配信は未開始");
+      await loadNotificationSettings();
       toast("通知時刻を"+time+"に保存したよ！");
     }catch(e){
       $("notification-time-status").textContent="保存できませんでした: "+errorText(e);
@@ -724,6 +729,10 @@
       if(a==="enable-test-notifications")await enableLocalNotifications();
       if(a==="send-local-test-notification")await showLocalTestNotification();
       if(a==="save-notification-time")await saveNotificationTime();
+      if(a==="register-push-device")await registerPushDevice();
+      if(a==="remove-push-device")await removePushDevice();
+      if(a==="send-remote-push-test")await sendRemotePushTest();
+      if(a==="toggle-push-auto")await toggleAutomaticPush();
       if(a==="save-modal"){
         const form=$("modal-form");
         if(!form)throw Error("入力画面が見つかりません");
