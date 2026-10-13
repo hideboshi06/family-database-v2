@@ -1,0 +1,12 @@
+{
+  "id": "/family-database-v2/",
+  "name": "Family Database",
+  "short_name": "Family DB",
+  "description": "家族の予定・やること",
+  "start_url": "/family-database-v2/",
+  "scope": "/family-database-v2/",
+  "display": "standalone",
+  "background_color": "#f3f7fa",
+  "theme_color": "#2d6595",
+  "lang": "ja"
+}
