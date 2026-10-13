@@ -529,7 +529,8 @@
       const changed=state.draft.has(day),opened=state.opened.has(day);
       const preview=f.map(k=>monthValue(day,k)).filter(Boolean).map(x=>String(x).replace(/\s+/g," ").slice(0,20)).join(" / ");
       return '<div class="monthday'+(changed?" dirty":"")+'"><button type="button" class="monthtop" data-action="expand-day" data-day="'+day+'"><span class="monthdate '+weekend(day)+'">'+fmtDay(day)+(holidayName(day)?'<span class="holiday-name month-holiday">'+esc(holidayName(day))+'</span>':"")+(changed?'<span class="changedmark">変更</span>':"")+'</span><span class="monthpreview">'+esc(preview||"未入力")+'</span><span class="tiny">'+(opened?"▲":"▼")+'</span></button>'+
-        (opened?'<div class="monthfields">'+f.map(k=>'<label class="field">'+person[k]+'</label><textarea data-month-field="'+k+'" data-day="'+day+'" rows="'+(k==="lunch"?5:2)+'" placeholder="'+person[k]+'を入力・貼り付け">'+esc(monthValue(day,k))+'</textarea>').join("")+'</div>':"")+'</div>';
+        (opened?'<div class="monthfields">'+f.map(k=>'<label class="field">'+person[k]+'</label><textarea data-month-field="'+k+'" data-day="'+day+'" rows="'+(k==="lunch"?5:2)+'" placeholder="'+person[k]+'を入力・貼り付け">'+esc(monthValue(day,k))+'</textarea>').join("")+
+          (state.mode==="schedule"?agendaUrlEditor(key=>monthValue(day,key),day):"")+'</div>':"")+'</div>';
     }).join("");
     updateCount();
   }
@@ -549,7 +550,7 @@
   async function loadMonth(force=false){
     if(!force&&state.monthCache===state.month)return;
     const dates=monthDays(state.month);
-    const r=await state.client.from("daily").select("day,kai,papa,mama,event,lunch").gte("day",dates[0]).lte("day",dates[dates.length-1]).order("day");
+    const r=await state.client.from("daily").select("day,kai,papa,mama,event,lunch,kai_url,papa_url,mama_url,event_url").gte("day",dates[0]).lte("day",dates[dates.length-1]).order("day");
     state.monthRows=new Map(check(r).map(x=>[x.day,x]));
     state.monthCache=state.month;renderMonth();
   }
@@ -567,7 +568,12 @@
     let count=0,fail=[];
     for(let i=0;i<work.length;i+=4){
       await Promise.all(work.slice(i,i+4).map(async([day,ch])=>{
-        try{await updateDay(day,Object.fromEntries(Object.entries(ch).map(([k,v])=>[k,v.trim()||null])));state.draft.delete(day);count++;}
+        try{
+          const props=Object.fromEntries(Object.entries(ch).map(([k,v])=>[
+            k,k.endsWith("_url")?normalizeAgendaUrl(v,person[k.replace(/_url$/,"")]||"予定"):String(v||"").trim()||null
+          ]));
+          await updateDay(day,props);state.draft.delete(day);count++;
+        }
         catch(e){fail.push(fmtDay(day)+" "+errorText(e));}
       }));
     }
@@ -730,7 +736,7 @@
     if(el.matches('input[data-action="todo-bought"]'))completeShopping(el);
     if(el.matches('input[data-action="todo-cleaned"]'))completeCleaning(el);
   }
-  function input(e){if(e.target.matches("textarea[data-month-field]"))updateDraft(e.target);}
+  function input(e){if(e.target.matches("textarea[data-month-field],input[data-month-field]"))updateDraft(e.target);}
   async function submit(e){
     const form=e.target;if(!["modal-form","member-form"].includes(form.id))return;
     e.preventDefault();
