@@ -95,6 +95,116 @@
       show("login");$("login-error").textContent="ログイン確認: "+errorText(e);$("login-error").hidden=false;
     }
   }
+  async function invokePush(action,payload={}){
+    const res=await state.client.functions.invoke("family-push",{body:{action,...payload}});
+    if(res.error){
+      let reason="";
+      try{reason=(await res.error.context?.json())?.error||"";}catch{}
+      const readable={no_registered_device:"先に管理者の端末を登録してください。",
+        backend_missing:"サーバー設定を確認してください。",
+        login_required:"再ログインしてください。",
+        admin_only:"管理者専用の操作です。"};
+      throw Error(readable[reason]||reason||res.error.message||"送信処理が失敗しました");
+    }
+    if(res.data?.error)throw Error(res.data.error);
+    return res.data;
+  }
+  function assertPushReady(){
+    if(!("serviceWorker" in navigator)||!("Notification" in window)||!("PushManager" in window))
+      throw Error("この環境はプッシュ通知に対応していません");
+    const ios=/iPhone|iPad|iPod/i.test(navigator.userAgent||"");
+    const standalone=window.matchMedia?.("(display-mode: standalone)")?.matches||navigator.standalone===true;
+    if(ios&&!standalone)throw Error("ホーム画面に追加したFamily Databaseを開いてください");
+  }
+  async function refreshPushDeviceStatus(){
+    if(!state.user)return;
+    const status=$("push-device-status");
+    try{
+      assertPushReady();
+      const reg=await navigator.serviceWorker.ready;
+      const sub=await reg.pushManager.getSubscription();
+      if(!sub){
+        status.textContent=Notification.permission==="denied"
+          ?"通知が拒否されています。端末の設定で許可してください。"
+          :"この端末はまだ登録されていません。";
+        return;
+      }
+      const saved=check(await state.client.from("push_subscriptions").select("endpoint")
+        .eq("endpoint",sub.endpoint).eq("user_id",state.user.id).maybeSingle());
+      status.textContent=saved?"この端末は受信登録済みです。":"この端末はまだSupabaseに登録されていません。";
+    }catch(e){status.textContent=errorText(e);}
+  }
+  function parseVapidPublicKey(value){
+    const b64=value.replace(/-/g,"+").replace(/_/g,"/");
+    const binary=atob(b64.padEnd(Math.ceil(b64.length/4)*4,"="));
+    return Uint8Array.from(binary,c=>c.charCodeAt(0));
+  }
+  async function registerPushDevice(){
+    if(!state.user)throw Error("ログインしてください");
+    assertPushReady();
+    const button=$("register-push-device");
+    button.disabled=true;
+    $("push-device-status").textContent="この端末を登録しています…";
+    try{
+      if(Notification.permission!=="granted"){
+        const granted=await Notification.requestPermission();
+        if(granted!=="granted")throw Error("通知の許可が必要です");
+      }
+      const reg=await navigator.serviceWorker.ready;
+      const key=await invokePush("public-key");
+      if(!key?.publicKey)throw Error("サーバー公開鍵の取得に失敗しました");
+      let sub=await reg.pushManager.getSubscription();
+      if(!sub)sub=await reg.pushManager.subscribe({
+        userVisibleOnly:true,applicationServerKey:parseVapidPublicKey(key.publicKey)
+      });
+      const keys=sub.toJSON().keys||{};
+      if(!keys.p256dh||!keys.auth)throw Error("端末の暗号鍵を確認できません");
+      check(await state.client.from("push_subscriptions").upsert({
+        endpoint:sub.endpoint,user_id:state.user.id,p256dh:keys.p256dh,auth:keys.auth,
+        user_agent:(navigator.userAgent||"").slice(0,350),
+        updated_at:new Date().toISOString()
+      },{onConflict:"endpoint"}));
+      await refreshPushDeviceStatus();
+      toast("プッシュ通知の受信端末として登録したよ！");
+    }finally{button.disabled=false;}
+  }
+  async function removePushDevice(){
+    if(!state.user)throw Error("ログインしてください");
+    assertPushReady();
+    const reg=await navigator.serviceWorker.ready;
+    const sub=await reg.pushManager.getSubscription();
+    if(!sub){await refreshPushDeviceStatus();return;}
+    check(await state.client.from("push_subscriptions").delete().eq("endpoint",sub.endpoint)
+      .eq("user_id",state.user.id));
+    await sub.unsubscribe();
+    await refreshPushDeviceStatus();
+    toast("この端末の通知登録を解除したよ");
+  }
+  async function sendRemotePushTest(){
+    if(state.role!=="admin")throw Error("管理者専用です");
+    const button=$("send-remote-push-test");
+    button.disabled=true;
+    $("push-remote-status").textContent="Supabaseから送信しています…";
+    try{
+      const r=await invokePush("send-test");
+      $("push-remote-status").textContent="送信結果：成功 "+r.sent+"台 / 失敗 "+r.failed+"台";
+      if(!r.sent)throw Error("送信できませんでした。端末の登録状態を確認してください");
+      toast("サーバーからテスト通知を送信したよ！");
+    }finally{button.disabled=false;}
+  }
+  async function toggleAutomaticPush(){
+    if(state.role!=="admin")throw Error("管理者専用です");
+    const button=$("push-auto-toggle"),enabled=button.dataset.enabled==="true";
+    const prompt=enabled?"家族全員への毎朝の自動配信を停止しますか？"
+      :"サーバーからのプッシュがアプリを閉じた状態でも届いたことを確認しましたか？開始すると登録済みの家族全員へ毎朝配信されます。旧ショートカットとの二重通知に注意してください。";
+    if(!confirm(prompt))return;
+    button.disabled=true;
+    try{
+      await invokePush("set-delivery",{enabled:!enabled});
+      await loadNotificationSettings();
+      toast(enabled?"自動配信を停止したよ":"毎朝の自動配信を開始したよ！");
+    }finally{button.disabled=false;}
+  }
   async function loadNotificationSettings(){
     if(state.role!=="admin")return;
     const row=check(await state.client.from("notification_settings")
