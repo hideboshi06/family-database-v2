@@ -85,11 +85,10 @@
       if(!m.data){$("denied-email").textContent=email;show("denied");return;}
       state.user=u.data.user;state.role=m.data.role;
       $("settings-admin").hidden=state.role!=="admin";
-      $("settings-push-test").hidden=state.role!=="admin";
+      $("notification-admin-controls").hidden=state.role!=="admin";
       show("main");navigate("dashboard");
       if("serviceWorker" in navigator)
         navigator.serviceWorker.register("./sw.js",{scope:"./"}).catch(e=>console.warn("Service Worker:",e));
-      refreshPushTestStatus();
       if(location.search.includes("code="))history.replaceState(null,"",location.pathname);
       await refresh();
     }catch(e){
@@ -184,26 +183,11 @@
     await refreshPushDeviceStatus();
     toast("この端末の通知登録を解除したよ");
   }
-  async function sendRemotePushTest(){
-    if(state.role!=="admin")throw Error("管理者専用です");
-    const button=$("send-remote-push-test");
-    button.disabled=true;
-    $("push-remote-status").textContent="Supabaseから送信しています…";
-    try{
-      const r=await invokePush("send-test");
-      $("push-remote-status").textContent="送信結果：成功 "+r.sent+"台 / 失敗 "+r.failed+"台";
-      if(!r.sent)throw Error("送信できませんでした。端末の登録状態を確認してください");
-      toast("サーバーからテスト通知を送信したよ！");
-    }catch(e){
-      $("push-remote-status").textContent="テスト送信エラー: "+errorText(e);
-      throw e;
-    }finally{button.disabled=false;}
-  }
   async function toggleAutomaticPush(){
     if(state.role!=="admin")throw Error("管理者専用です");
     const button=$("push-auto-toggle"),enabled=button.dataset.enabled==="true";
     const prompt=enabled?"家族全員への毎朝の自動配信を停止しますか？"
-      :"サーバーからのプッシュがアプリを閉じた状態でも届いたことを確認しましたか？開始すると登録済みの家族全員へ毎朝配信されます。旧ショートカットとの二重通知に注意してください。";
+      :"登録済みの家族全員の端末へ、毎朝設定時刻に通知を配信します。開始しますか？ 旧ショートカット通知との二重配信に注意してください。";
     if(!confirm(prompt))return;
     button.disabled=true;
     try{
@@ -224,7 +208,7 @@
     toggle.textContent=row.delivery_enabled?"自動配信を停止":"自動配信を開始";
     $("push-auto-status").textContent=row.delivery_enabled
       ?"自動配信中：毎朝"+time+"（日本時間）"
-      :"自動配信は停止中。サーバーからの受信テスト後に開始してください。";
+      :"自動配信は停止中。開始すると登録済みの端末へ毎朝配信します。";
   }
   async function saveNotificationTime(){
     if(state.role!=="admin")throw Error("管理者専用の設定です");
@@ -251,70 +235,6 @@
       button.disabled=false;
       button.textContent="時刻を保存";
     }
-  }
-  function refreshPushTestStatus(){
-    if(state.role!=="admin")return;
-    const p=$("push-test-status");
-    if(!("serviceWorker" in navigator)||!("Notification" in window)){
-      p.textContent="この環境ではWeb通知が利用できません。";return;
-    }
-    const ios=/iPhone|iPad|iPod/i.test(navigator.userAgent||"");
-    const installed=window.matchMedia?.("(display-mode: standalone)")?.matches||navigator.standalone===true;
-    if(ios&&!installed){
-      p.textContent="iPhoneはSafariから「ホーム画面に追加」したFamily Databaseを開いてね。";
-      return;
-    }
-    const permission=Notification.permission;
-    p.textContent=permission==="granted"
-      ?"通知は許可済み。この端末への表示テストができます。"
-      :permission==="denied"
-        ?"通知が拒否されています。iPhoneの設定からFamily Databaseの通知を許可してね。"
-        :"通知はまだ許可されていません。下の「通知を許可」を押してね。";
-  }
-  function checkLocalPushReady(){
-    if(state.role!=="admin")throw Error("管理者専用です");
-    if(!("serviceWorker" in navigator)||!("Notification" in window))
-      throw Error("このブラウザでは通知が利用できません");
-    const ios=/iPhone|iPad|iPod/i.test(navigator.userAgent||"");
-    const installed=window.matchMedia?.("(display-mode: standalone)")?.matches||navigator.standalone===true;
-    if(ios&&!installed)throw Error("ホーム画面に追加したFamily Databaseから操作してね");
-  }
-  async function enableLocalNotifications(){
-    checkLocalPushReady();
-    const p=await Notification.requestPermission();
-    refreshPushTestStatus();
-    if(p!=="granted")throw Error("通知の許可が必要です");
-    toast("通知を許可したよ！");
-  }
-  function todayPushMessage(){
-    const today=isoToday(),day=state.daily.find(x=>x.day===today)||{};
-    const rows=[];
-    const add=(label,value)=>{
-      const str=String(value||"").trim();
-      if(str)rows.push(label+"："+str.replace(/\\s+/g," "));
-    };
-    add("天気",[
-      day.morning_weather?"朝 "+day.morning_weather+(day.morning_temp_c!=null?" "+day.morning_temp_c+"℃":""):"",
-      day.evening_weather?"夕 "+day.evening_weather+(day.evening_temp_c!=null?" "+day.evening_temp_c+"℃":""):""
-    ].filter(Boolean).join(" / "));
-    fields.forEach(k=>add(person[k],day[k]));
-    add("給食",day.lunch);
-    add("ゴミ",day.garbage);
-    add("掃除",dueCleaningToday(today).join("、"));
-    add("タスク",dueTasksToday(today).join("、"));
-    add("買い物",shoppingToday().join("、"));
-    return rows.join(String.fromCharCode(10)).slice(0,950)||"今日は登録されている予定がありません。";
-  }
-  async function showLocalTestNotification(){
-    checkLocalPushReady();
-    if(Notification.permission!=="granted")throw Error("先に通知を許可してください");
-    const reg=await navigator.serviceWorker.ready;
-    await reg.showNotification("🗓 今日の家族スケジュール（テスト）",{
-      body:todayPushMessage(),
-      tag:"family-database-manual-test",
-      data:{url:new URL("./?from=push-test",location.href).href}
-    });
-    toast("この端末にテスト通知を表示したよ！");
   }
   async function signIn(){
     const button=$("login-button");
@@ -732,12 +652,9 @@
       if(a==="logout"||a==="switch")await signOut();
       if(a==="reload"){location.reload();return;}
       if(a==="refresh"){await refresh();toast("更新したよ！");}
-      if(a==="enable-test-notifications")await enableLocalNotifications();
-      if(a==="send-local-test-notification")await showLocalTestNotification();
       if(a==="save-notification-time")await saveNotificationTime();
       if(a==="register-push-device")await registerPushDevice();
       if(a==="remove-push-device")await removePushDevice();
-      if(a==="send-remote-push-test")await sendRemotePushTest();
       if(a==="toggle-push-auto")await toggleAutomaticPush();
       if(a==="save-modal"){
         const form=$("modal-form");
