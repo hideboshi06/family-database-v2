@@ -131,7 +131,7 @@ Deno.serve(async(req:Request)=>{
    try{
     const subs=get(await db.rpc("active_family_push_subscriptions")) as Subscription[];
     const result=await broadcast(db,subs);
-    await db.from("push_delivery_runs").update({...result,recipients:result.devices,status:"finished",finished_at:new Date().toISOString()}).eq("day",now.day);
+    await db.from("push_delivery_runs").update({recipients:result.devices,sent:result.sent,failed:result.failed,status:"finished",finished_at:new Date().toISOString()}).eq("day",now.day);
     return json(200,{ok:true,...result});
    }catch(e){
     await db.from("push_delivery_runs").update({status:"failed",finished_at:new Date().toISOString()}).eq("day",now.day);
