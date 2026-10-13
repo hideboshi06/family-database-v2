@@ -2,6 +2,38 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { send, encrypt } from "jsr:@daaku/webpush@0.2.0";
 
+// Supabase Edge Runtime Deno 2.1 does not yet expose the 2025 TypedArray Base64
+// helpers used by @daaku/webpush 0.2.0. Supply compatible methods before sending.
+const binaryClass=Uint8Array as typeof Uint8Array & {
+ fromBase64?: (input:string,options?:{alphabet?:"base64"|"base64url"})=>Uint8Array
+};
+if(typeof binaryClass.fromBase64!=="function"){
+ Object.defineProperty(binaryClass,"fromBase64",{configurable:true,value:(input:string,options?:{alphabet?:"base64"|"base64url"})=>{
+  if(typeof input!=="string")throw new TypeError("Expected Base64 string");
+  let encoded=input.replace(/[ \\t\\n\\r\\f]/g,"");
+  if(options?.alphabet==="base64url")encoded=encoded.replace(/-/g,"+").replace(/_/g,"/");
+  if(!/^[a-zA-Z0-9+/]*={0,2}$/.test(encoded)||encoded.length%4===1)
+   throw new SyntaxError("Invalid Base64 input");
+  const binary=atob(encoded.padEnd(Math.ceil(encoded.length/4)*4,"="));
+  return Uint8Array.from(binary,chr=>chr.charCodeAt(0));
+ }});
+}
+const binaryPrototype=Uint8Array.prototype as Uint8Array & {
+ toBase64?: (options?:{alphabet?:"base64"|"base64url";omitPadding?:boolean})=>string
+};
+if(typeof binaryPrototype.toBase64!=="function"){
+ Object.defineProperty(binaryPrototype,"toBase64",{configurable:true,value:function(
+  this:Uint8Array,options?:{alphabet?:"base64"|"base64url";omitPadding?:boolean}
+ ){
+  let raw="";
+  for(const value of this)raw+=String.fromCharCode(value);
+  let out=btoa(raw);
+  if(options?.alphabet==="base64url")out=out.replace(/\\+/g,"-").replace(/\\//g,"_");
+  if(options?.omitPadding)out=out.replace(/=+$/,"");
+  return out;
+ }});
+}
+
 const SITE="https://hideboshi06.github.io/family-database-v2/";
 const ORIGIN="https://hideboshi06.github.io";
 const headers={"access-control-allow-origin":ORIGIN,"access-control-allow-headers":"authorization,apikey,content-type,x-client-info","access-control-allow-methods":"POST,OPTIONS","content-type":"application/json","cache-control":"no-store"};
