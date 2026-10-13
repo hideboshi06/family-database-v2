@@ -167,6 +167,9 @@
       },{onConflict:"endpoint"}));
       await refreshPushDeviceStatus();
       toast("プッシュ通知の受信端末として登録したよ！");
+    }catch(e){
+      $("push-device-status").textContent="端末登録エラー: "+errorText(e);
+      throw e;
     }finally{button.disabled=false;}
   }
   async function removePushDevice(){
