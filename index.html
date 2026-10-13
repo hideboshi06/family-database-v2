@@ -4,9 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#f3f7fa">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Family DB">
+<link rel="manifest" href="./manifest.webmanifest">
 <meta name="description" content="Family Database v2 — 家族の予定・給食・掃除・買い物">
 <title>Family Database</title>
-<link rel="stylesheet" href="./styles.css?v=20261009-aligned-agenda">
+<link rel="stylesheet" href="./styles.css?v=20261013-local-push-test">
 </head>
 <body>
 <!-- Compatibility for older cached app.js versions; never shown to the user. -->
@@ -182,6 +185,16 @@
           <button type="submit" class="btn full" style="margin-top:10px">家族を追加</button>
         </form>
       </section>
+      <section class="card" id="settings-push-test" hidden>
+        <h2>🧪 テスト通知（管理者のみ）</h2>
+        <p class="small">今日のSupabaseのデータから通知を作成します。まずはこの端末の通知表示と、タップでスケジュールが開くことを確認します。</p>
+        <p id="push-test-status" class="small" role="status" aria-live="polite">通知の状態を確認しています…</p>
+        <div class="push-test-actions">
+          <button type="button" class="btn secondary smallbtn" data-action="enable-test-notifications">通知を許可</button>
+          <button type="button" class="btn smallbtn" data-action="send-local-test-notification">この端末にテスト通知</button>
+        </div>
+        <p class="tiny">iPhoneはSafariの「ホーム画面に追加」から起動して操作してください。現在は端末内の表示テストのみで、アプリを閉じた状態への定時プッシュ配信はまだ無効です。</p>
+      </section>
     </div>
     <p class="status" id="page-status" role="status" aria-live="polite"></p>
     <nav class="tabbar" aria-label="メインメニュー">
@@ -204,6 +217,6 @@
 
 <script>window.FD_CONFIG = {url:"https://besevrrmhwmkdqmoiscf.supabase.co",key:"sb_publishable_oo7Bdb8Ip-icb6Y0nqovKg_OH9Taql2"};</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="./app.js?v=20261009-empty-row" defer></script>
+<script src="./app.js?v=20261013-local-push-test" defer></script>
 </body>
 </html>
