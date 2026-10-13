@@ -354,3 +354,8 @@ details.help summary{color:var(--navy);cursor:pointer;font-size:12px}
 .daily-agenda-lines .who{font-size:12px;font-weight:750;padding-top:3px;color:var(--sub)}
 .daily-agenda-lines .schedule-text{font-size:14px;line-height:1.6}
 .daily-agenda-empty{font-size:14px!important;padding:0!important}
+
+/* Hidden entirely from non-admins; built-in test does not schedule broadcast. */
+.push-test-actions{display:flex;flex-wrap:wrap;gap:9px;margin:12px 0}
+#settings-push-test .small{line-height:1.65}
+#settings-push-test .tiny{line-height:1.6}
