@@ -355,22 +355,17 @@ details.help summary{color:var(--navy);cursor:pointer;font-size:12px}
 .daily-agenda-lines .schedule-text{font-size:14px;line-height:1.6}
 .daily-agenda-empty{font-size:14px!important;padding:0!important}
 
-/* Hidden entirely from non-admins; built-in test does not schedule broadcast. */
-.push-test-actions{display:flex;flex-wrap:wrap;gap:9px;margin:12px 0}
-#settings-push-test .small{line-height:1.65}
-#settings-push-test .tiny{line-height:1.6}
-
-/* Administrator-controlled morning delivery preference; no automatic push is started. */
-.notification-time-setting{padding:12px 0 9px;margin:6px 0 12px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
-.notification-time-setting .field{display:block;margin:0 0 8px}
-.notification-time-controls{display:flex;align-items:center;flex-wrap:wrap;gap:9px}
+/* Single notification settings card for family and administrator controls. */
+#settings-notifications .small,#settings-notifications .tiny{line-height:1.6;overflow-wrap:anywhere}
+#settings-notifications h3{font-size:15px;font-weight:750;margin:0 0 10px}
+#settings-notifications h3 .small{font-size:12px;font-weight:500;color:var(--sub)}
+.notification-section{padding-top:15px;margin-top:15px;border-top:1px solid var(--line)}
+.notification-section .small{margin:9px 0}
+.notification-section .tiny{margin:8px 0 0}
+.notification-actions,.notification-time-controls{display:flex;align-items:center;flex-wrap:wrap;gap:9px;margin:12px 0}
 .notification-time-controls .input{width:145px;max-width:100%;min-width:0;font-size:16px}
 .notification-time-controls .btn{min-height:43px}
-.notification-time-setting .small{margin:9px 0 5px;overflow-wrap:anywhere}
-.notification-time-setting .tiny{line-height:1.6;margin:6px 0}
-
-/* PWA Web Push device enrollment and dispatch controls. */
-#settings-push-device .small,#settings-push-device .tiny{line-height:1.65}
-#settings-push-device .small{margin:9px 0}
-#settings-push-device .tiny{margin:5px 0}
-#push-auto-status,#push-remote-status{overflow-wrap:anywhere}
+.notification-auto-heading{gap:9px;align-items:center}
+.notification-auto-heading h3{margin:0!important;min-width:0}
+.notification-auto-heading .btn{flex-shrink:0}
+@media (max-width:370px){.notification-auto-heading{align-items:flex-start;flex-direction:column}}
