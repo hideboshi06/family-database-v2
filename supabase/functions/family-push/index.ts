@@ -116,6 +116,10 @@ Deno.serve(async(req:Request)=>{
   }
   if(action==="set-delivery"&&signedIn){
    if(typeof input.enabled!=="boolean")return json(400,{error:"invalid_flag"});
+   if(input.enabled){
+    const registered=get(await db.rpc("active_family_push_subscriptions")) as Subscription[];
+    if(!registered.length)return json(409,{error:"no_registered_device"});
+   }
    const result=get(await db.from("notification_settings").update({delivery_enabled:input.enabled})
     .eq("id",1).select("delivery_enabled,send_time").single());
    return json(200,{ok:true,enabled:result.delivery_enabled,clock:str(result.send_time).slice(0,5)});
