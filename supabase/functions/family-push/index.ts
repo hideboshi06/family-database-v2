@@ -149,7 +149,7 @@ Deno.serve(async(req:Request)=>{
   const db=createClient(url,serviceKey,{auth:{persistSession:false,autoRefreshToken:false}});
   const input=await req.json() as {action?:string;enabled?:boolean},action=str(input?.action);
   let signedIn:{id:string;role:string}|null=null;
-  if(action==="scheduled"||action==="self-test"||action==="self-crypto-test"){
+  if(action==="scheduled"||action==="self-test"||action==="self-crypto-test"||action==="self-delivery-test"){
    const token=req.headers.get("x-family-push-cron")||"";
    if(!token)return json(401,{error:"missing_cron_credential"});
    if(!get(await db.rpc("verify_family_push_cron",{candidate:token})))return json(403,{error:"invalid_cron_credential"});
@@ -182,6 +182,12 @@ Deno.serve(async(req:Request)=>{
     return json(422,{ok:false,stage:"encryption",kind:e instanceof Error?e.name:"unknown",
       detail:e instanceof Error?e.message.slice(0,250):"unknown"});
    }
+  }
+  if(action==="self-delivery-test"){
+   const subs=get(await db.rpc("active_family_push_subscriptions")) as Subscription[];
+   if(subs.length!==1)return json(409,{error:"expected_exactly_one_test_device"});
+   const outcome=await broadcast(db,subs,true);
+   return json(outcome.sent===1?200:502,{ok:outcome.sent===1,...outcome});
   }
   if(action==="self-test")return json(200,{ok:true,publicKeyValid:(await keys(db)).public_key.length===87});
   if(action==="public-key")return json(200,{publicKey:(await keys(db)).public_key});
