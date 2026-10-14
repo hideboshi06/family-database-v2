@@ -4,6 +4,17 @@
   const cfg = window.FD_CONFIG || {};
   const person = {kai:"カイ",papa:"パパ",mama:"ママ",event:"イベント",lunch:"給食"};
   const fields = ["kai","papa","mama","event"];
+  const catalogGenres=[
+    {name:"パパ",icon:"👨"},{name:"ママ",icon:"👩"},{name:"カイ",icon:"👦"},
+    {name:"炊事",icon:"🍳"},{name:"生活雑貨",icon:"🧴"},{name:"家",icon:"🏠"},
+    {name:"キャンプ",icon:"🏕️"},{name:"食品",icon:"🥬"}
+  ];
+  function itemGenre(x){
+    if(catalogGenres.some(g=>g.name===x.catalog_genre))return x.catalog_genre;
+    if(x.category==="雑貨")return "生活雑貨";
+    if(x.category==="育児")return "カイ";
+    return catalogGenres.some(g=>g.name===x.category)?x.category:"生活雑貨";
+  }
   const esc = v => String(v == null ? "" : v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const isoToday = () => {
     const pts=new Intl.DateTimeFormat("en-US",{timeZone:"Asia/Tokyo",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date());
@@ -24,7 +35,7 @@
   };
   const state={client:null,user:null,role:null,tab:"dashboard",daily:[],shopping:[],cleaning:[],members:[],
     month:isoToday().slice(0,7),mode:"schedule",monthCache:null,monthRows:new Map(),draft:new Map(),opened:new Set(),
-    tasks:[],shoppingCategory:"食品",showCompleted:false};
+    tasks:[],shoppingCategory:"食品",showCompleted:false,catalog:[],catalogGenre:"パパ"};
   let toastTimeout;
   const check = r => {if(r.error)throw r.error;return r.data;};
   const errorText=e=>e?.message||String(e);
@@ -47,11 +58,13 @@
   // iOS Safari standalone/webview may not dispatch submit for that layout.
   function actions(){return '<button class="btn secondary" type="button" data-action="close">キャンセル</button><button class="btn" type="button" data-action="save-modal">保存</button>';}
   function navigate(page){
+    if(page==="catalog"&&state.role!=="admin")return;
     state.tab=page;
     document.querySelectorAll(".page").forEach(el=>el.classList.toggle("active",el.id==="page-"+page));
     document.querySelectorAll(".tabbar [data-tab]").forEach(el=>el.classList.toggle("active",el.dataset.tab===(page==="month"?"dashboard":page)));
     if(page==="month"){renderMonth();loadMonth().catch(e=>report(e,"月間読込: "));}
     if(page==="todo")renderTodo();
+    if(page==="catalog")renderCatalog();
     if(page==="settings"){
       refreshPushDeviceStatus().catch(e=>report(e,"受信端末: "));
       loadMembers().catch(e=>report(e,"メンバー読込: "));
@@ -85,6 +98,8 @@
       if(!m.data){$("denied-email").textContent=email;show("denied");return;}
       state.user=u.data.user;state.role=m.data.role;
       $("settings-admin").hidden=state.role!=="admin";
+      $("page-catalog").hidden=state.role!=="admin";
+      $("catalog-tab").hidden=state.role!=="admin";
       $("notification-admin-controls").hidden=state.role!=="admin";
       show("main");navigate("dashboard");
       if("serviceWorker" in navigator)
@@ -258,14 +273,17 @@
   }
   async function refresh(){
     $("page-status").textContent="データを読み込み中…";
-    const [d,c,s,t]=await Promise.all([
+    const [d,c,s,t,catalog]=await Promise.all([
       state.client.from("daily").select("*").gte("day",isoToday()).lte("day",dateAdd(isoToday(),8)).order("day"),
       state.client.from("cleaning").select("*").order("id"),
-      state.client.from("shopping").select("*").order("sort_order",{ascending:true,nullsFirst:false}),
-      state.client.from("tasks").select("*").order("created_at",{ascending:true})
+      state.client.from("shopping").select("*").eq("shopping_list",true).order("sort_order",{ascending:true,nullsFirst:false}),
+      state.client.from("tasks").select("*").order("created_at",{ascending:true}),
+      state.role==="admin"?state.client.from("shopping").select("*").order("product"):Promise.resolve(null)
     ]);
     state.daily=check(d);state.cleaning=check(c);state.shopping=check(s);state.tasks=check(t);
+    state.catalog=state.role==="admin"?check(catalog):[];
     renderDashboard();renderTodo();
+    if(state.role==="admin")renderCatalog();
     $("page-status").textContent="Supabase接続中 · "+new Date().toLocaleTimeString("ja-JP",{timeZone:"Asia/Tokyo",hour:"2-digit",minute:"2-digit"})+" 読込";
   }
   const agendaUrlField=k=>k+"_url";
@@ -336,7 +354,7 @@
       (t==null?"–":esc(t))+"℃"+gap+rain+"%"+umbrella;
   }
   function shoppingRow(x,brief=false){
-    return '<div class="itemrow"><label class="checkboxlabel"><input type="checkbox" data-action="shopping-needed" data-id="'+esc(x.id)+'" '+(x.needed?"checked":"")+'><span class="itemmain"><span class="item-title">'+esc(x.product)+(x.quantity?' <span class="tiny">×'+esc(x.quantity)+'</span>':"")+'</span><span class="item-sub" style="display:block">'+esc(brief?(x.note||""):[x.note,x.store].filter(Boolean).join(" · "))+'</span></span></label>'+
+    return '<div class="itemrow"><label class="checkboxlabel"><input type="checkbox" data-action="shopping-needed" data-id="'+esc(x.id)+'" '+(x.needed?"checked":"")+'><span class="itemmain"><span class="item-title">'+esc(x.product)+'</span><span class="item-sub" style="display:block">'+esc(brief?(x.note||""):[x.note,x.store].filter(Boolean).join(" · "))+'</span></span></label>'+
       (brief?"":'<button type="button" class="btn secondary smallbtn" data-action="edit-shopping" data-id="'+esc(x.id)+'">編集</button>')+'</div>';
   }
   function filledAgendaFields(row){
@@ -379,7 +397,7 @@
   function shoppingToday(){
     return state.shopping
       .filter(x=>x.needed)
-      .map(x=>String(x.product||"").trim()+(x.quantity?" ×"+String(x.quantity).trim():""))
+      .map(x=>String(x.product||"").trim())
       .filter(Boolean);
   }
   function todoLinesHTML(lines){
@@ -453,7 +471,7 @@
     const needed=state.shopping.filter(x=>x.needed);
     const all=openTasks.map(t=>({kind:"task",id:t.id,label:t.title,meta:taskDetail(t),due:t.due_on||"9999-12-31"}))
       .concat(dueCleaning.map(c=>({kind:"cleaning",id:c.id,label:c.name,meta:c.next_due?fmtDay(c.next_due):"期限なし",due:c.next_due||"9999-12-31"})))
-      .concat(needed.map(x=>({kind:"shopping",id:x.id,label:x.product+(x.quantity?" ×"+x.quantity:""),meta:x.category||"",due:"9999-12-31"})));
+      .concat(needed.map(x=>({kind:"shopping",id:x.id,label:x.product,meta:x.category||"",due:"9999-12-31"})));
     const order={task:0,cleaning:1,shopping:2};
     all.sort((a,b)=>a.due.localeCompare(b.due)||order[a.kind]-order[b.kind]||a.label.localeCompare(b.label,"ja"));
     $("todo-items").innerHTML=all.length?all.map(t=>todoRow(t.label,t.meta,t.kind,t.id)).join(""):'<p class="empty">やることはありません</p>';
@@ -472,6 +490,62 @@
     $("shopping-categories").innerHTML=cats.map(cat=>'<button type="button" data-action="shopping-category" data-category="'+esc(cat)+'" class="category-pill'+(state.shoppingCategory===cat?" active":"")+'">'+esc(cat)+'</button>').join("");
     const rows=state.shopping.filter(x=>(String(x.category||"").trim()||"未分類")===state.shoppingCategory);
     $("shopping-items").innerHTML=rows.length?rows.map(x=>shoppingRow(x)).join(""):'<p class="empty">このカテゴリの商品はありません</p>';
+  }
+
+  function renderCatalog(){
+    if(state.role!=="admin")return;
+    const all=state.catalog;
+    $("catalog-total").textContent=all.length+"品目";
+    $("catalog-genres").innerHTML=catalogGenres.map(g=>{
+      const count=all.filter(x=>itemGenre(x)===g.name).length;
+      const active=state.catalogGenre===g.name;
+      return '<button type="button" class="catalog-genre'+(active?" active":"")+'" data-action="catalog-genre" data-genre="'+esc(g.name)+'" aria-pressed="'+active+'"><span class="emoji">'+g.icon+'</span><span class="genre-name">'+esc(g.name)+'</span><span class="genre-count">'+count+'品目</span></button>';
+    }).join("");
+    const selected=catalogGenres.find(g=>g.name===state.catalogGenre)||catalogGenres[0];
+    $("catalog-current-title").textContent=selected.icon+" "+selected.name+"の図鑑";
+    const rows=all.filter(x=>itemGenre(x)===selected.name).sort((a,b)=>String(a.product).localeCompare(String(b.product),"ja"));
+    $("catalog-current-count").textContent=rows.length+"品目";
+    $("catalog-items").innerHTML=rows.map(x=>{
+      const detail=[x.shopping_list?"🛒 買い物リストに登録":null,x.needed?"今買うもの":null,x.arrived_on?"来た日 "+x.arrived_on:null,x.released_on?"手放した日 "+x.released_on:null].filter(Boolean).join(" · ");
+      return '<div class="catalog-row"><div class="catalog-row-main"><div class="catalog-item-name">'+esc(x.product)+'</div>'+(detail?'<div class="catalog-item-meta">'+esc(detail)+'</div>':"")+'</div><button class="btn secondary smallbtn" type="button" data-action="edit-catalog" data-id="'+esc(x.id)+'">編集</button></div>';
+    }).join("")||'<p class="empty">まだ品目はありません。上の入力欄から登録できるよ。</p>';
+  }
+  async function addCatalog(form){
+    if(state.role!=="admin")throw Error("管理者専用です");
+    const product=String(new FormData(form).get("product")||"").trim(),genre=state.catalogGenre;
+    if(!product||product.length>150)throw Error("品名は1〜150文字で入力してね");
+    if(!catalogGenres.some(g=>g.name===genre))throw Error("ジャンルを確認してね");
+    const b=form.querySelector('button[type="submit"]');b.disabled=true;
+    try{
+      check(await state.client.from("shopping").insert({
+        id:"catalog-"+(crypto.randomUUID?.()||String(Date.now())+Math.random().toString(36).slice(2)),
+        product,category:genre,catalog_genre:genre,shopping_list:false,
+        needed:false,quick_display:false,updated_at:new Date().toISOString()
+      }));
+      form.reset();await refresh();toast("図鑑に登録したよ");
+    }finally{b.disabled=false;}
+  }
+  function editCatalog(id){
+    if(state.role!=="admin")throw Error("管理者専用です");
+    const x=state.catalog.find(x=>x.id===id);
+    if(!x)throw Error("品目が見つかりません");
+    const genre=itemGenre(x);
+    const html='<form id="modal-form" data-kind="catalog"><input type="hidden" name="id" value="'+esc(id)+'">'+
+      '<label class="field">品名</label><input name="product" class="input" required maxlength="150" value="'+esc(x.product)+'">'+
+      '<label class="field">図鑑のジャンル</label><select class="input" name="catalog_genre">'+catalogGenres.map(g=>'<option value="'+esc(g.name)+'"'+(g.name===genre?" selected":"")+'>'+esc(g.name)+'</option>').join("")+'</select>'+
+      '<label class="catalog-check"><input type="checkbox" name="shopping_list" data-action="catalog-shopping-list" '+(x.shopping_list?"checked":"")+'>買い物リストに登録（リピート用）</label>'+
+      '<label class="catalog-check"><input type="checkbox" name="needed" '+(x.needed?"checked":"")+' '+(!x.shopping_list?"disabled":"")+'>今、買うもの</label>'+
+      '<details class="catalog-date-fields"'+((x.arrived_on||x.released_on)?" open":"")+'><summary>日付を入力（任意）</summary>'+
+      '<label class="field">来た日</label><input type="date" class="input" name="arrived_on" value="'+esc(x.arrived_on||"")+'">'+
+      '<label class="field">手放した日</label><input type="date" class="input" name="released_on" value="'+esc(x.released_on||"")+'"></details></form>';
+    modal("図鑑の品目を編集",html,'<button type="button" class="btn secondary smallbtn danger" data-action="delete-catalog" data-id="'+esc(id)+'">削除</button>'+actions());
+  }
+  async function removeCatalog(id){
+    if(state.role!=="admin")throw Error("管理者専用です");
+    const x=state.catalog.find(x=>x.id===id);
+    if(!x||!confirm("「"+x.product+"」を図鑑と買い物リストの両方から削除する？ 取り消しはできないよ。"))return;
+    check(await state.client.from("shopping").delete().eq("id",id).select("id").single());
+    closeModal();await refresh();toast("品目を削除したよ");
   }
   function renderCleaning(){
     $("cleaning-items").innerHTML=state.cleaning.map(c=>'<div class="itemrow"><div class="itemmain"><div class="item-title">'+esc(c.name)+'</div><div class="item-sub">周期 '+esc(c.interval_days||"未設定")+'日 · 最終 '+esc(c.last_done||"—")+' · 次回 '+esc(c.next_due||"—")+'</div></div><button type="button" class="btn secondary smallbtn" data-action="done-clean" data-id="'+esc(c.id)+'">完了</button></div>').join("")||'<p class="empty">掃除項目はありません</p>';
@@ -498,7 +572,6 @@
     const html='<form id="modal-form" data-kind="shopping"><input type="hidden" name="id" value="'+esc(id||"")+'">'+
       '<label class="field" for="shopping-product">商品名</label><input class="input" name="product" id="shopping-product" value="'+esc(x.product||"")+'" required maxlength="150">'+
       '<label class="field">カテゴリ</label><select class="input" name="category">'+categories.map(c=>'<option value="'+esc(c)+'" '+(c===category?"selected":"")+'>'+esc(c)+'</option>').join("")+'</select>'+
-      '<label class="field">数量</label><input class="input" name="quantity" value="'+esc(x.quantity||"1")+'">'+
       '<label class="field">購入場所</label><input class="input" name="store" value="'+esc(x.store||"")+'">'+
       '<label class="field">メモ</label><textarea name="note" rows="3">'+esc(x.note||"")+'</textarea></form>';
     modal(id?"商品を編集":"買い物を追加",html,actions());
@@ -674,11 +747,20 @@
         savedTaskId=saved.id;
       }else if(kind==="shopping"){
         const id=String(fd.get("id")||"");
-        const props={product:String(fd.get("product")||"").trim(),quantity:String(fd.get("quantity")||"").trim()||null,category:String(fd.get("category")||"").trim()||null,store:String(fd.get("store")||"").trim()||null,note:String(fd.get("note")||"").trim()||null,updated_at:new Date().toISOString()};
-        if(!props.product)throw Error("商品名を入力してね");
-        const existing=state.shopping.some(x=>x.id===id);
-        if(existing)check(await state.client.from("shopping").update(props).eq("id",id));
-        else check(await state.client.from("shopping").insert({...props,id:"item-"+(crypto.randomUUID?.()||String(Date.now())+Math.random().toString(36).slice(2)),needed:true,quick_display:true,sort_order:Math.max(0,...state.shopping.map(x=>Number(x.sort_order)||0))+1}));
+        const props={product:String(fd.get("product")||"").trim(),category:String(fd.get("category")||"").trim()||null,store:String(fd.get("store")||"").trim()||null,note:String(fd.get("note")||"").trim()||null,updated_at:new Date().toISOString()};
+        if(!props.product||props.product.length>150)throw Error("品名は1〜150文字で入力してね");
+        if(state.shopping.some(x=>x.id===id))check(await state.client.from("shopping").update(props).eq("id",id));
+        else check(await state.client.from("shopping").insert({...props,id:"item-"+(crypto.randomUUID?.()||String(Date.now())+Math.random().toString(36).slice(2)),shopping_list:true,needed:true,quick_display:true,sort_order:Math.max(0,...state.shopping.map(x=>Number(x.sort_order)||0))+1}));
+      }else if(kind==="catalog"){
+        if(state.role!=="admin")throw Error("図鑑は管理者専用です");
+        const id=String(fd.get("id")||""),product=String(fd.get("product")||"").trim();
+        const genre=String(fd.get("catalog_genre")||""),listed=fd.get("shopping_list")==="on";
+        if(!state.catalog.some(x=>x.id===id))throw Error("品目が見つかりません");
+        if(!product||product.length>150)throw Error("品名は1〜150文字で入力してね");
+        if(!catalogGenres.some(g=>g.name===genre))throw Error("ジャンルを確認してね");
+        const props={product,catalog_genre:genre,shopping_list:listed,needed:listed&&fd.get("needed")==="on",
+          arrived_on:String(fd.get("arrived_on")||"")||null,released_on:String(fd.get("released_on")||"")||null,updated_at:new Date().toISOString()};
+        check(await state.client.from("shopping").update(props).eq("id",id).select("id").single());
       }
       await refresh();
       if(savedTaskId&&!state.tasks.some(t=>t.id===savedTaskId))
@@ -726,11 +808,18 @@
       if(a==="shopping-category"){state.shoppingCategory=el.dataset.category;renderShopping();}
       if(a==="add-shopping")await editShopping("");
       if(a==="edit-shopping")await editShopping(el.dataset.id);
+       if(a==="catalog-genre"&&state.role==="admin"&&catalogGenres.some(g=>g.name===el.dataset.genre)){state.catalogGenre=el.dataset.genre;renderCatalog();}
+       if(a==="edit-catalog")editCatalog(el.dataset.id);
+       if(a==="delete-catalog")await removeCatalog(el.dataset.id);
       if(a==="remove-member")await removeMember(el.dataset.email);
     }catch(error){report(error,"操作エラー: ");}
   }
   function change(e){
     const el=e.target;
+    if(el.matches('input[data-action="catalog-shopping-list"]')){
+      const needed=$("modal-form")?.querySelector('input[name="needed"]');
+      if(needed){if(!el.checked)needed.checked=false;needed.disabled=!el.checked;}
+    }
     if(el.matches('input[data-action="shopping-needed"]'))toggleShopping(el);
     if(el.matches('input[data-action="task-completed"]'))toggleTask(el);
     if(el.matches('input[data-action="todo-bought"]'))completeShopping(el);
@@ -738,8 +827,12 @@
   }
   function input(e){if(e.target.matches("textarea[data-month-field],input[data-month-field]"))updateDraft(e.target);}
   async function submit(e){
-    const form=e.target;if(!["modal-form","member-form"].includes(form.id))return;
+    const form=e.target;if(!["modal-form","member-form","catalog-quick-form"].includes(form.id))return;
     e.preventDefault();
+    if(form.id==="catalog-quick-form"){
+      try{await addCatalog(form);}catch(error){report(error,"図鑑登録: ");}
+      return;
+    }
     try{if(form.id==="modal-form")await submitModal(form);else await addMember(form);}
     catch(error){report(error,"追加失敗: ");}
   }
