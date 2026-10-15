@@ -510,6 +510,8 @@
   // Compress only on the device, once per upload. Never send an original large photo.
   const catalogPhotoBucket="family-item-images";
   const isCatalogPhotoPath=path=>/^items\/[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+\.jpg$/.test(String(path||""));
+  const imagePositions={"top-left":"left top","top":"center top","top-right":"right top","left":"left center","center":"center center","right":"right center","bottom-left":"left bottom","bottom":"center bottom","bottom-right":"right bottom"};
+  const imagePosition=v=>Object.hasOwn(imagePositions,v)?v:"center";
   async function resizeCatalogPhoto(file){
     if(!file||!file.size)throw Error("写真を選んでね");
     if(file.size>20*1024*1024)throw Error("写真は20MB以下のものを選んでね");
@@ -525,14 +527,14 @@
       });
       if(!image.naturalWidth||!image.naturalHeight)throw Error("画像の大きさを確認できません");
       const canvas=document.createElement("canvas"),side=640;
-      canvas.width=side;canvas.height=side;
-      const context=canvas.getContext("2d");
-      if(!context)throw Error("この端末では画像を加工できません");
-      context.fillStyle="#fff";context.fillRect(0,0,side,side);
       const scale=Math.min(side/image.naturalWidth,side/image.naturalHeight);
       const w=Math.max(1,Math.round(image.naturalWidth*scale));
       const h=Math.max(1,Math.round(image.naturalHeight*scale));
-      context.drawImage(image,(side-w)/2,(side-h)/2,w,h);
+      canvas.width=w;canvas.height=h;
+      const context=canvas.getContext("2d");
+      if(!context)throw Error("この端末では画像を加工できません");
+      context.fillStyle="#fff";context.fillRect(0,0,w,h);
+      context.drawImage(image,0,0,w,h);
       let blob=null;
       for(const quality of [0.82,0.72,0.6]){
         blob=await new Promise(resolve=>canvas.toBlob(resolve,"image/jpeg",quality));
@@ -643,7 +645,7 @@
       const detail=[x.shopping_list?"🛒":null,x.needed?"今買うもの":null,x.arrived_on?"来た日 "+x.arrived_on:null,x.released_on?"手放した日 "+x.released_on:null,x.note||null].filter(Boolean).join(" · ");
       const hasPhoto=isCatalogPhotoPath(x.image);
       const picture='<div class="catalog-imagebox"><span class="catalog-image-placeholder" aria-hidden="true">📦</span>'+
-        (hasPhoto?'<img class="catalog-thumb" data-image-path="'+esc(x.image)+'" alt="'+esc(x.product)+'の写真" loading="lazy" decoding="async" hidden>':"")+'</div>';
+        (hasPhoto?'<img class="catalog-thumb" data-image-path="'+esc(x.image)+'" alt="'+esc(x.product)+'の写真" loading="lazy" decoding="async" style="object-position:'+imagePositions[imagePosition(x.image_position)]+'" hidden>':"")+'</div>';
       return '<div class="catalog-row">'+picture+'<div class="catalog-row-main"><div class="catalog-item-name">'+esc(x.product)+'</div>'+(detail?'<div class="catalog-item-meta">'+esc(detail)+'</div>':"")+'</div><button class="btn secondary smallbtn" type="button" data-action="edit-catalog" data-id="'+esc(x.id)+'">編集</button></div>';
     }).join("")||'<p class="empty">まだ品目はありません。上の入力欄から登録できるよ。</p>';
     if(rows.some(x=>isCatalogPhotoPath(x.image)))
@@ -679,7 +681,7 @@
       '<div class="catalog-photo-buttons">'+
       '<label class="btn secondary smallbtn catalog-photo-button">📷 撮影する<input type="file" name="photo_camera" accept="image/*" capture="environment" data-action="catalog-photo-select" class="catalog-photo-input"></label>'+
       '<label class="btn secondary smallbtn catalog-photo-button">🖼️ 写真を選ぶ<input type="file" name="photo_library" accept="image/*" data-action="catalog-photo-select" class="catalog-photo-input"></label>'+
-      '</div><p class="tiny catalog-photo-status" id="catalog-photo-status" role="status" aria-live="polite" aria-atomic="true" data-phase="idle">'+(x.image?"写真を登録済み。別の写真を選ぶと差し替えられるよ。":"写真を選ばなくても登録できるよ。")+'</p>'+
+      '</div><label class="field">写真の表示位置</label><select class="input" name="image_position">'+Object.entries(imagePositions).map(([key])=>'<option value="'+key+'"'+(imagePosition(x.image_position)===key?' selected':'')+'>'+({"top-left":"左上","top":"上","top-right":"右上","left":"左","center":"中央","right":"右","bottom-left":"左下","bottom":"下","bottom-right":"右下"}[key])+'</option>').join("")+'</select><p class="tiny catalog-photo-status" id="catalog-photo-status" role="status" aria-live="polite" aria-atomic="true" data-phase="idle">'+(x.image?"写真を登録済み。別の写真を選ぶと差し替えられるよ。":"写真を選ばなくても登録できるよ。")+'</p>'+
       (x.image?'<label class="catalog-check"><input type="checkbox" name="remove_photo" data-action="catalog-remove-photo">写真を外す</label>':"")+
       '</div>'+
       '<details class="catalog-date-fields"'+((x.arrived_on||x.released_on)?" open":"")+'><summary>日付を入力（任意）</summary>'+
@@ -910,6 +912,7 @@
           arrived_on:String(fd.get("arrived_on")||"")||null,released_on:String(fd.get("released_on")||"")||null,updated_at:new Date().toISOString()};
         const existing=state.catalog.find(x=>x.id===id),file=chosenCatalogFile(fd);
         const removePhoto=fd.get("remove_photo")==="on";
+        props.image_position=removePhoto?"center":imagePosition(String(fd.get("image_position")||"center"));
         if(file&&!removePhoto&&catalogPhotoPrep?.signature!==photoSignature(file))
           throw Error("写真の準備が終わるまで待ってね");
         let uploadedPath=null;
