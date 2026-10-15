@@ -17,6 +17,11 @@
     const genre=genreAliases[original]||original;
     return catalogGenres.some(g=>g.name===genre)?genre:"生活雑貨";
   }
+  // Shopping groups are display-only; the shared master keeps eight genres.
+  const shoppingGroup=x=>{
+    const genre=itemGenre(x);
+    return genre==="食品"||genre==="生活雑貨"?genre:"その他";
+  };
   const esc = v => String(v == null ? "" : v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const isoToday = () => {
     const pts=new Intl.DateTimeFormat("en-US",{timeZone:"Asia/Tokyo",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date());
@@ -485,10 +490,10 @@
     renderShopping();renderCleaning();
   }
   function renderShopping(){
-    const cats=catalogGenres.map(g=>g.name);
+    const cats=["食品","生活雑貨","その他"];
     if(!cats.includes(state.shoppingCategory))state.shoppingCategory="食品";
     $("shopping-categories").innerHTML=cats.map(cat=>'<button type="button" data-action="shopping-category" data-category="'+esc(cat)+'" class="category-pill'+(state.shoppingCategory===cat?" active":"")+'">'+esc(cat)+'</button>').join("");
-    const rows=state.shopping.filter(x=>itemGenre(x)===state.shoppingCategory);
+    const rows=state.shopping.filter(x=>shoppingGroup(x)===state.shoppingCategory);
     $("shopping-items").innerHTML=rows.length?rows.map(x=>shoppingRow(x)).join(""):'<p class="empty">このカテゴリの商品はありません</p>';
   }
 
@@ -506,7 +511,7 @@
     const rows=all.filter(x=>itemGenre(x)===selected.name).sort((a,b)=>String(a.product).localeCompare(String(b.product),"ja"));
     $("catalog-current-count").textContent=rows.length+"品目";
     $("catalog-items").innerHTML=rows.map(x=>{
-      const detail=[x.shopping_list?"🛒 買い物リストに登録":null,x.needed?"今買うもの":null,x.arrived_on?"来た日 "+x.arrived_on:null,x.released_on?"手放した日 "+x.released_on:null,x.note||null].filter(Boolean).join(" · ");
+      const detail=[x.shopping_list?"🛒":null,x.needed?"今買うもの":null,x.arrived_on?"来た日 "+x.arrived_on:null,x.released_on?"手放した日 "+x.released_on:null,x.note||null].filter(Boolean).join(" · ");
       return '<div class="catalog-row"><div class="catalog-row-main"><div class="catalog-item-name">'+esc(x.product)+'</div>'+(detail?'<div class="catalog-item-meta">'+esc(detail)+'</div>':"")+'</div><button class="btn secondary smallbtn" type="button" data-action="edit-catalog" data-id="'+esc(x.id)+'">編集</button></div>';
     }).join("")||'<p class="empty">まだ品目はありません。上の入力欄から登録できるよ。</p>';
   }
@@ -568,7 +573,7 @@
   }
   async function editShopping(id){
     const x=state.shopping.find(a=>a.id===id)||{};
-    const category=id?itemGenre(x):state.shoppingCategory;
+    const category=id?itemGenre(x):(state.shoppingCategory==="その他"?"ホーム":state.shoppingCategory);
     const html='<form id="modal-form" data-kind="shopping"><input type="hidden" name="id" value="'+esc(id||"")+'">'+
       '<label class="field" for="shopping-product">商品名</label><input class="input" name="product" id="shopping-product" value="'+esc(x.product||"")+'" required maxlength="150">'+
       '<label class="field">ジャンル</label><select class="input" name="category">'+catalogGenres.map(g=>'<option value="'+esc(g.name)+'" '+(g.name===category?"selected":"")+'>'+esc(g.name)+'</option>').join("")+'</select>'+
