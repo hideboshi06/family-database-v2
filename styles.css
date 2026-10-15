@@ -439,3 +439,9 @@ details.help summary{color:var(--navy);cursor:pointer;font-size:12px}
 
 /* Let the image overlay the placeholder only after the file starts loading. */
 .catalog-imagebox .catalog-thumb{position:absolute;inset:0}
+
+/* Clearly distinguish selected photos waiting for processing, ready to save, and errors. */
+.catalog-photo-status{margin:9px 0 2px!important;min-height:1.6em}
+.catalog-photo-status[data-phase="working"]{color:var(--navy);font-weight:700}
+.catalog-photo-status[data-phase="ready"]{color:var(--ok);font-weight:700}
+.catalog-photo-status[data-phase="error"]{color:var(--red);font-weight:700}
