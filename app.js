@@ -85,6 +85,7 @@
     if(page==="month"){renderMonth();loadMonth().catch(e=>report(e,"月間読込: "));}
     if(page==="todo")renderTodo();
     if(page==="catalog")renderCatalog();
+    if(page==="notes")window.FamilyNotes?.load();
     if(page==="settings"){
       refreshPushDeviceStatus().catch(e=>report(e,"受信端末: "));
       loadMembers().catch(e=>report(e,"メンバー読込: "));
@@ -117,6 +118,16 @@
       check(m);
       if(!m.data){$("denied-email").textContent=email;show("denied");return;}
       state.user=u.data.user;state.role=m.data.role;
+      window.FamilyNotes?.init({
+        client:state.client,role:state.role,
+        getCatalog:()=>state.role==="admin"?state.catalog:state.shopping,
+        openCatalog:id=>{
+          if(state.role!=="admin"){navigate("todo");toast("図鑑の詳しい情報は管理者が確認できるよ。");return;}
+          const item=state.catalog.find(x=>x.id===id);
+          if(!item){toast("図鑑の品目が見つかりません",true);return;}
+          state.catalogGenre=itemGenre(item);navigate("catalog");editCatalog(id);
+        }
+      });
       $("settings-admin").hidden=state.role!=="admin";
       $("page-catalog").hidden=state.role!=="admin";
       $("catalog-tab").hidden=state.role!=="admin";
@@ -304,6 +315,7 @@
     state.catalog=state.role==="admin"?check(catalog):[];
     renderDashboard();renderTodo();
     if(state.role==="admin")renderCatalog();
+    if(state.tab==="notes")window.FamilyNotes?.load();
     $("page-status").textContent="Supabase接続中 · "+new Date().toLocaleTimeString("ja-JP",{timeZone:"Asia/Tokyo",hour:"2-digit",minute:"2-digit"})+" 読込";
   }
   const agendaUrlField=k=>k+"_url";
