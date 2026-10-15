@@ -42,7 +42,8 @@
   };
   const state={client:null,user:null,role:null,tab:"dashboard",daily:[],shopping:[],cleaning:[],members:[],
     month:isoToday().slice(0,7),mode:"schedule",monthCache:null,monthRows:new Map(),draft:new Map(),opened:new Set(),
-    tasks:[],shoppingCategory:"食品",showCompleted:false,catalog:[],catalogGenre:"ホーム"};
+    tasks:[],shoppingCategory:"食品",showCompleted:false,catalog:[],catalogGenre:"ホーム",
+    catalogImageUrls:new Map()};
   let toastTimeout;
   const check = r => {if(r.error)throw r.error;return r.data;};
   const errorText=e=>e?.message||String(e);
@@ -497,6 +498,83 @@
     $("shopping-items").innerHTML=rows.length?rows.map(x=>shoppingRow(x)).join(""):'<p class="empty">このカテゴリの商品はありません</p>';
   }
 
+
+  // Compress only on the device, once per upload. Never send an original large photo.
+  const catalogPhotoBucket="family-item-images";
+  const isCatalogPhotoPath=path=>/^items\/[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+\.jpg$/.test(String(path||""));
+  async function resizeCatalogPhoto(file){
+    if(!file||!file.size)throw Error("写真を選んでね");
+    if(file.size>20*1024*1024)throw Error("写真は20MB以下のものを選んでね");
+    if(!file.type.startsWith("image/"))throw Error("画像ファイルを選んでね");
+    const source=URL.createObjectURL(file);
+    let image;
+    try{
+      image=await new Promise((resolve,reject)=>{
+        const img=new Image();
+        img.onload=()=>resolve(img);
+        img.onerror=()=>reject(Error("写真を読み込めませんでした。JPEGの写真でも試してね"));
+        img.src=source;
+      });
+      if(!image.naturalWidth||!image.naturalHeight)throw Error("画像の大きさを確認できません");
+      const canvas=document.createElement("canvas"),side=640;
+      canvas.width=side;canvas.height=side;
+      const context=canvas.getContext("2d");
+      if(!context)throw Error("この端末では画像を加工できません");
+      context.fillStyle="#fff";context.fillRect(0,0,side,side);
+      const scale=Math.min(side/image.naturalWidth,side/image.naturalHeight);
+      const w=Math.max(1,Math.round(image.naturalWidth*scale));
+      const h=Math.max(1,Math.round(image.naturalHeight*scale));
+      context.drawImage(image,(side-w)/2,(side-h)/2,w,h);
+      let blob=null;
+      for(const quality of [0.82,0.72,0.6]){
+        blob=await new Promise(resolve=>canvas.toBlob(resolve,"image/jpeg",quality));
+        if(!blob)throw Error("写真をJPEGに変換できませんでした");
+        if(blob.size<=450*1024)break;
+      }
+      if(blob.size>1024*1024)throw Error("写真が大きすぎるため保存できません");
+      return blob;
+    }finally{URL.revokeObjectURL(source);}
+  }
+  async function showCatalogImages(){
+    if(state.role!=="admin")return;
+    const images=[...document.querySelectorAll("#catalog-items img[data-image-path]")];
+    const now=Date.now(),paths=[...new Set(images.map(el=>el.dataset.imagePath))];
+    const needed=paths.filter(path=>isCatalogPhotoPath(path)
+      &&(!state.catalogImageUrls.has(path)||state.catalogImageUrls.get(path).expires<=now));
+    if(needed.length){
+      const signed=check(await state.client.storage.from(catalogPhotoBucket).createSignedUrls(needed,3600));
+      signed.forEach((item,i)=>{
+        if(item.signedUrl&&!item.error){
+          const url=new URL(item.signedUrl,cfg.url);
+          if(url.origin===new URL(cfg.url).origin)
+            state.catalogImageUrls.set(needed[i],{url:url.href,expires:Date.now()+50*60*1000});
+        }
+      });
+    }
+    // Recheck the current DOM: the user may have switched genres while signing.
+    document.querySelectorAll("#catalog-items img[data-image-path]").forEach(el=>{
+      const entry=state.catalogImageUrls.get(el.dataset.imagePath);
+      if(entry&&entry.expires>Date.now()){
+        el.src=entry.url;
+        el.hidden=false;
+        const placeholder=el.parentElement.querySelector(".catalog-image-placeholder");
+        if(placeholder)placeholder.hidden=true;
+      }
+    });
+  }
+  function chosenCatalogFile(fd){
+    for(const name of ["photo_camera","photo_library"]){
+      const file=fd.get(name);
+      if(file instanceof File&&file.size>0)return file;
+    }
+    return null;
+  }
+  async function removeCatalogPhoto(path){
+    if(!isCatalogPhotoPath(path))return;
+    const result=await state.client.storage.from(catalogPhotoBucket).remove([path]);
+    if(result.error)console.warn("Photo cleanup:",result.error);
+    state.catalogImageUrls.delete(path);
+  }
   function renderCatalog(){
     if(state.role!=="admin")return;
     const all=state.catalog;
@@ -512,8 +590,13 @@
     $("catalog-current-count").textContent=rows.length+"品目";
     $("catalog-items").innerHTML=rows.map(x=>{
       const detail=[x.shopping_list?"🛒":null,x.needed?"今買うもの":null,x.arrived_on?"来た日 "+x.arrived_on:null,x.released_on?"手放した日 "+x.released_on:null,x.note||null].filter(Boolean).join(" · ");
-      return '<div class="catalog-row"><div class="catalog-row-main"><div class="catalog-item-name">'+esc(x.product)+'</div>'+(detail?'<div class="catalog-item-meta">'+esc(detail)+'</div>':"")+'</div><button class="btn secondary smallbtn" type="button" data-action="edit-catalog" data-id="'+esc(x.id)+'">編集</button></div>';
+      const hasPhoto=isCatalogPhotoPath(x.image);
+      const picture='<div class="catalog-imagebox"><span class="catalog-image-placeholder" aria-hidden="true">📦</span>'+
+        (hasPhoto?'<img class="catalog-thumb" data-image-path="'+esc(x.image)+'" alt="'+esc(x.product)+'の写真" loading="lazy" decoding="async" hidden>':"")+'</div>';
+      return '<div class="catalog-row">'+picture+'<div class="catalog-row-main"><div class="catalog-item-name">'+esc(x.product)+'</div>'+(detail?'<div class="catalog-item-meta">'+esc(detail)+'</div>':"")+'</div><button class="btn secondary smallbtn" type="button" data-action="edit-catalog" data-id="'+esc(x.id)+'">編集</button></div>';
     }).join("")||'<p class="empty">まだ品目はありません。上の入力欄から登録できるよ。</p>';
+    if(rows.some(x=>isCatalogPhotoPath(x.image)))
+      showCatalogImages().catch(e=>console.warn("Photo display:",e));
   }
   async function addCatalog(form){
     if(state.role!=="admin")throw Error("管理者専用です");
@@ -541,6 +624,13 @@
       '<label class="catalog-check"><input type="checkbox" name="shopping_list" data-action="catalog-shopping-list" '+(x.shopping_list?"checked":"")+'>買い物リストに登録（リピート用）</label>'+
       '<label class="catalog-check"><input type="checkbox" name="needed" '+(x.needed?"checked":"")+' '+(!x.shopping_list?"disabled":"")+'>今、買うもの</label>'+
       '<label class="field">メモ（任意）</label><textarea name="note" rows="3">'+esc(x.note||"")+'</textarea>'+
+      '<div class="catalog-photo-editor"><label class="field">写真（任意）</label>'+
+      '<div class="catalog-photo-buttons">'+
+      '<label class="btn secondary smallbtn catalog-photo-button">📷 撮影する<input type="file" name="photo_camera" accept="image/*" capture="environment" data-action="catalog-photo-select" class="catalog-photo-input"></label>'+
+      '<label class="btn secondary smallbtn catalog-photo-button">🖼️ 写真を選ぶ<input type="file" name="photo_library" accept="image/*" data-action="catalog-photo-select" class="catalog-photo-input"></label>'+
+      '</div><p class="tiny" id="catalog-photo-status">'+(x.image?"写真を登録済み。別の写真を選ぶと差し替えられるよ。":"写真を選ばなくても登録できるよ。")+'</p>'+
+      (x.image?'<label class="catalog-check"><input type="checkbox" name="remove_photo" data-action="catalog-remove-photo">写真を外す</label>':"")+
+      '</div>'+
       '<details class="catalog-date-fields"'+((x.arrived_on||x.released_on)?" open":"")+'><summary>日付を入力（任意）</summary>'+
       '<label class="field">来た日</label><input type="date" class="input" name="arrived_on" value="'+esc(x.arrived_on||"")+'">'+
       '<label class="field">手放した日</label><input type="date" class="input" name="released_on" value="'+esc(x.released_on||"")+'"></details></form>';
@@ -551,6 +641,7 @@
     const x=state.catalog.find(x=>x.id===id);
     if(!x||!confirm("「"+x.product+"」を図鑑と買い物リストの両方から削除する？ 取り消しはできないよ。"))return;
     check(await state.client.from("shopping").delete().eq("id",id).select("id").single());
+    if(x.image)await removeCatalogPhoto(x.image);
     closeModal();await refresh();toast("品目を削除したよ");
   }
   function renderCleaning(){
@@ -766,7 +857,26 @@
         const props={product,category:genre,shopping_list:listed,needed:listed&&fd.get("needed")==="on",
           note:String(fd.get("note")||"").trim()||null,
           arrived_on:String(fd.get("arrived_on")||"")||null,released_on:String(fd.get("released_on")||"")||null,updated_at:new Date().toISOString()};
-        check(await state.client.from("shopping").update(props).eq("id",id).select("id").single());
+        const existing=state.catalog.find(x=>x.id===id),file=chosenCatalogFile(fd);
+        const removePhoto=fd.get("remove_photo")==="on";
+        let uploadedPath=null;
+        try{
+          if(file&&!removePhoto){
+            status.textContent="写真を小さく整えています…";
+            const jpeg=await resizeCatalogPhoto(file);
+            uploadedPath="items/"+id+"/"+(crypto.randomUUID?.()||String(Date.now())+Math.random().toString(36).slice(2))+".jpg";
+            status.textContent="写真を保存しています…";
+            check(await state.client.storage.from(catalogPhotoBucket).upload(uploadedPath,jpeg,
+              {contentType:"image/jpeg",cacheControl:"31536000",upsert:false}));
+            props.image=uploadedPath;
+          }else if(removePhoto)props.image=null;
+          check(await state.client.from("shopping").update(props).eq("id",id).select("id").single());
+        }catch(error){
+          if(uploadedPath)await removeCatalogPhoto(uploadedPath);
+          throw error;
+        }
+        if((uploadedPath||removePhoto)&&existing.image)
+          await removeCatalogPhoto(existing.image);
       }
       await refresh();
       if(savedTaskId&&!state.tasks.some(t=>t.id===savedTaskId))
@@ -822,6 +932,21 @@
   }
   function change(e){
     const el=e.target;
+    if(el.matches('input[data-action="catalog-photo-select"]')){
+      const form=el.closest("form");
+      const sibling=form?.querySelector('input[data-action="catalog-photo-select"]:not([name="'+el.name+'"])');
+      if(sibling)sibling.value="";
+      const remove=form?.querySelector('input[name="remove_photo"]');
+      if(remove)remove.checked=false;
+      const status=$("catalog-photo-status");
+      if(status&&el.files?.length)status.textContent=el.files[0].name+" を保存時に軽く整えるよ";
+    }
+    if(el.matches('input[data-action="catalog-remove-photo"]')&&el.checked){
+      const form=el.closest("form");
+      form?.querySelectorAll('input[data-action="catalog-photo-select"]').forEach(input=>input.value="");
+      const status=$("catalog-photo-status");
+      if(status)status.textContent="保存すると写真を外すよ";
+    }
     if(el.matches('input[data-action="catalog-shopping-list"]')){
       const needed=$("modal-form")?.querySelector('input[name="needed"]');
       if(needed){if(!el.checked)needed.checked=false;needed.disabled=!el.checked;}
