@@ -47,6 +47,8 @@
   let toastTimeout;
   let catalogPhotoPrep=null;
   let catalogPhotoRevision=0;
+  let catalogPreviewObjectUrl=null;
+  function releaseCatalogPreview(){if(catalogPreviewObjectUrl){URL.revokeObjectURL(catalogPreviewObjectUrl);catalogPreviewObjectUrl=null;}}
   const check = r => {if(r.error)throw r.error;return r.data;};
   const errorText=e=>e?.message||String(e);
   function toast(message,isError=false){
@@ -58,6 +60,7 @@
   function modal(title,content,footer){
     catalogPhotoRevision++;
     catalogPhotoPrep=null;
+    releaseCatalogPreview();
     $("modal-title").textContent=title;
     $("modal-content").innerHTML=content;
     $("modal-actions").innerHTML=footer;
@@ -68,6 +71,7 @@
   function closeModal(){
     catalogPhotoRevision++;
     catalogPhotoPrep=null;
+    releaseCatalogPreview();
     $("modal").hidden=true;$("modal-content").innerHTML="";
   }
   // Use a real click handler instead of a form-associated button outside the form:
@@ -511,7 +515,7 @@
   const catalogPhotoBucket="family-item-images";
   const isCatalogPhotoPath=path=>/^items\/[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+\.jpg$/.test(String(path||""));
   const imagePositions={"top-left":"left top","top":"center top","top-right":"right top","left":"left center","center":"center center","right":"right center","bottom-left":"left bottom","bottom":"center bottom","bottom-right":"right bottom"};
-  const imagePosition=v=>Object.hasOwn(imagePositions,v)?v:"center";
+  const imagePosition=v=>Object.prototype.hasOwnProperty.call(imagePositions,v)?v:"center";
   async function resizeCatalogPhoto(file){
     if(!file||!file.size)throw Error("写真を選んでね");
     if(file.size>20*1024*1024)throw Error("写真は20MB以下のものを選んでね");
@@ -581,6 +585,29 @@
     return null;
   }
 
+
+  function showCatalogPhotoPreview(url){
+    const preview=$("catalog-photo-preview");
+    if(!preview)return;
+    preview.src=url;
+    preview.hidden=false;
+    const selector=$("catalog-photo-position");
+    preview.style.objectPosition=imagePositions[imagePosition(selector?.value)];
+  }
+  async function loadCatalogPhotoPreview(path,form){
+    const revision=catalogPhotoRevision;
+    let entry=state.catalogImageUrls.get(path);
+    if(!entry||entry.expires<Date.now()){
+      const data=check(await state.client.storage.from(catalogPhotoBucket).createSignedUrls([path],3600));
+      if(!data?.[0]?.signedUrl)return;
+      const u=new URL(data[0].signedUrl,cfg.url);
+      if(u.origin!==new URL(cfg.url).origin)return;
+      entry={url:u.href,expires:Date.now()+50*60*1000};
+      state.catalogImageUrls.set(path,entry);
+    }
+    if(revision===catalogPhotoRevision&&$("modal-form")===form)
+      showCatalogPhotoPreview(entry.url);
+  }
   const photoSignature=file=>[file.name,file.size,file.lastModified,file.type].join("|");
   const catalogPhotoStatus=(message,phase)=>{
     const label=$("catalog-photo-status");
@@ -591,6 +618,7 @@
     if(!form||form.dataset.kind!=="catalog")return;
     const revision=++catalogPhotoRevision;
     catalogPhotoPrep=null;
+    releaseCatalogPreview();
     const save=$("modal-actions").querySelector('[data-action="save-modal"]');
     const other=form.querySelector('input[data-action="catalog-photo-select"]:not([name="'+input.name+'"])');
     if(other)other.value="";
@@ -610,6 +638,9 @@
       const blob=await resizeCatalogPhoto(file);
       if(revision!==catalogPhotoRevision||$("modal-form")!==form)return;
       catalogPhotoPrep={signature:photoSignature(file),blob};
+      releaseCatalogPreview();
+      catalogPreviewObjectUrl=URL.createObjectURL(blob);
+      showCatalogPhotoPreview(catalogPreviewObjectUrl);
       catalogPhotoStatus("✅ 写真の準備完了（"+Math.max(1,Math.round(blob.size/1024))+"KB）。「保存」で登録できるよ。","ready");
       if(save)save.disabled=false;
     }catch(e){
@@ -681,13 +712,14 @@
       '<div class="catalog-photo-buttons">'+
       '<label class="btn secondary smallbtn catalog-photo-button">📷 撮影する<input type="file" name="photo_camera" accept="image/*" capture="environment" data-action="catalog-photo-select" class="catalog-photo-input"></label>'+
       '<label class="btn secondary smallbtn catalog-photo-button">🖼️ 写真を選ぶ<input type="file" name="photo_library" accept="image/*" data-action="catalog-photo-select" class="catalog-photo-input"></label>'+
-      '</div><label class="field">写真の表示位置</label><select class="input" name="image_position">'+Object.entries(imagePositions).map(([key])=>'<option value="'+key+'"'+(imagePosition(x.image_position)===key?' selected':'')+'>'+({"top-left":"左上","top":"上","top-right":"右上","left":"左","center":"中央","right":"右","bottom-left":"左下","bottom":"下","bottom-right":"右下"}[key])+'</option>').join("")+'</select><p class="tiny catalog-photo-status" id="catalog-photo-status" role="status" aria-live="polite" aria-atomic="true" data-phase="idle">'+(x.image?"写真を登録済み。別の写真を選ぶと差し替えられるよ。":"写真を選ばなくても登録できるよ。")+'</p>'+
+      '</div><div class="catalog-photo-preview-box"><img id="catalog-photo-preview" alt="写真の表示位置プレビュー" hidden><span class="tiny">表示イメージ</span></div><label class="field">写真の表示位置</label><select class="input" id="catalog-photo-position" name="image_position">'+Object.entries(imagePositions).map(([key])=>'<option value="'+key+'"'+(imagePosition(x.image_position)===key?' selected':'')+'>'+({"top-left":"左上","top":"上","top-right":"右上","left":"左","center":"中央","right":"右","bottom-left":"左下","bottom":"下","bottom-right":"右下"}[key])+'</option>').join("")+'</select><p class="tiny catalog-photo-status" id="catalog-photo-status" role="status" aria-live="polite" aria-atomic="true" data-phase="idle">'+(x.image?"写真を登録済み。別の写真を選ぶと差し替えられるよ。":"写真を選ばなくても登録できるよ。")+'</p>'+
       (x.image?'<label class="catalog-check"><input type="checkbox" name="remove_photo" data-action="catalog-remove-photo">写真を外す</label>':"")+
       '</div>'+
       '<details class="catalog-date-fields"'+((x.arrived_on||x.released_on)?" open":"")+'><summary>日付を入力（任意）</summary>'+
       '<label class="field">来た日</label><input type="date" class="input" name="arrived_on" value="'+esc(x.arrived_on||"")+'">'+
       '<label class="field">手放した日</label><input type="date" class="input" name="released_on" value="'+esc(x.released_on||"")+'"></details></form>';
     modal("図鑑の品目を編集",html,'<button type="button" class="btn secondary smallbtn danger" data-action="delete-catalog" data-id="'+esc(id)+'">削除</button>'+actions());
+    if(isCatalogPhotoPath(x.image))loadCatalogPhotoPreview(x.image,$("modal-form")).catch(e=>console.warn("Preview:",e));
   }
   async function removeCatalog(id){
     if(state.role!=="admin")throw Error("管理者専用です");
@@ -990,6 +1022,10 @@
   }
   function change(e){
     const el=e.target;
+    if(el.matches('#catalog-photo-position')){
+      const preview=$("catalog-photo-preview");
+      if(preview)preview.style.objectPosition=imagePositions[imagePosition(el.value)];
+    }
     if(el.matches('input[data-action="catalog-photo-select"]')){
       prepareSelectedCatalogPhoto(el).catch(e=>report(e,"画像準備: "));
     }
