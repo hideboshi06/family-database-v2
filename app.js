@@ -592,6 +592,8 @@
     preview.src=url;
     preview.hidden=false;
     preview.parentElement.hidden=false;
+    const fields=$("catalog-photo-position-fields");
+    if(fields)fields.hidden=false;
     const selector=$("catalog-photo-position");
     preview.style.objectPosition=imagePositions[imagePosition(selector?.value)];
   }
@@ -713,7 +715,7 @@
       '<div class="catalog-photo-buttons">'+
       '<label class="btn secondary smallbtn catalog-photo-button">📷 撮影する<input type="file" name="photo_camera" accept="image/*" capture="environment" data-action="catalog-photo-select" class="catalog-photo-input"></label>'+
       '<label class="btn secondary smallbtn catalog-photo-button">🖼️ 写真を選ぶ<input type="file" name="photo_library" accept="image/*" data-action="catalog-photo-select" class="catalog-photo-input"></label>'+
-      '</div><div class="catalog-photo-preview-box"'+(isCatalogPhotoPath(x.image)?"":" hidden")+'><img id="catalog-photo-preview" alt="写真の表示位置プレビュー" hidden><span class="tiny">表示イメージ</span></div><label class="field">写真の表示位置</label><select class="input" id="catalog-photo-position" name="image_position">'+Object.entries(imagePositions).map(([key])=>'<option value="'+key+'"'+(imagePosition(x.image_position)===key?' selected':'')+'>'+({"top-left":"左上","top":"上","top-right":"右上","left":"左","center":"中央","right":"右","bottom-left":"左下","bottom":"下","bottom-right":"右下"}[key])+'</option>').join("")+'</select><p class="tiny catalog-photo-status" id="catalog-photo-status" role="status" aria-live="polite" aria-atomic="true" data-phase="idle">'+(x.image?"写真を登録済み。別の写真を選ぶと差し替えられるよ。":"写真を選ばなくても登録できるよ。")+'</p>'+
+      '</div><div class="catalog-photo-preview-box"'+(isCatalogPhotoPath(x.image)?"":" hidden")+'><img id="catalog-photo-preview" alt="写真の表示位置プレビュー" hidden><span class="tiny">表示イメージ</span></div><div id="catalog-photo-position-fields"'+(isCatalogPhotoPath(x.image)?"":" hidden")+'><label class="field">写真の表示位置</label><select class="input" id="catalog-photo-position" name="image_position">'+Object.entries(imagePositions).map(([key])=>'<option value="'+key+'"'+(imagePosition(x.image_position)===key?' selected':'')+'>'+({"top-left":"左上","top":"上","top-right":"右上","left":"左","center":"中央","right":"右","bottom-left":"左下","bottom":"下","bottom-right":"右下"}[key])+'</option>').join("")+'</select></div><p class="tiny catalog-photo-status" id="catalog-photo-status" role="status" aria-live="polite" aria-atomic="true" data-phase="idle">'+(x.image?"写真を登録済み。別の写真を選ぶと差し替えられるよ。":"写真を選ばなくても登録できるよ。")+'</p>'+
       (x.image?'<label class="catalog-check"><input type="checkbox" name="remove_photo" data-action="catalog-remove-photo">写真を外す</label>':"")+
       '</div>'+
       '<details class="catalog-date-fields"'+((x.arrived_on||x.released_on)?" open":"")+'><summary>日付を入力（任意）</summary>'+
@@ -1037,6 +1039,8 @@
       if(el.checked)form?.querySelectorAll('input[data-action="catalog-photo-select"]').forEach(input=>input.value="");
       const previewBox=$("catalog-photo-preview")?.parentElement;
       if(previewBox)previewBox.hidden=el.checked;
+      const fields=$("catalog-photo-position-fields");
+      if(fields)fields.hidden=el.checked;
       if(!el.checked&&isCatalogPhotoPath(state.catalog.find(x=>x.id===form?.querySelector('input[name="id"]')?.value)?.image)){
         const row=state.catalog.find(x=>x.id===form.querySelector('input[name="id"]').value);
         if(row)loadCatalogPhotoPreview(row.image,form).catch(e=>console.warn("Preview:",e));
