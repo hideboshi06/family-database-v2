@@ -640,11 +640,8 @@
     });
   }
   function chosenCatalogFile(fd){
-    for(const name of ["photo_camera","photo_library"]){
-      const file=fd.get(name);
-      if(file instanceof File&&file.size>0)return file;
-    }
-    return null;
+    const file=fd.get("photo");
+    return file instanceof File&&file.size>0?file:null;
   }
 
 
@@ -685,8 +682,6 @@
     catalogPhotoPrep=null;
     releaseCatalogPreview();
     const save=$("modal-actions").querySelector('[data-action="save-modal"]');
-    const other=form.querySelector('input[data-action="catalog-photo-select"]:not([name="'+input.name+'"])');
-    if(other)other.value="";
     const remove=form.querySelector('input[name="remove_photo"]');
     if(remove)remove.checked=false;
     const file=input.files?.[0];
@@ -778,10 +773,9 @@
       '<label class="catalog-check"><input type="checkbox" name="needed" '+(x.needed?"checked":"")+' '+(!x.shopping_list?"disabled":"")+'>今、買うもの</label>'+
       '<label class="field">メモ（任意）</label><textarea name="note" rows="3">'+esc(x.note||"")+'</textarea>'+
       '<div class="catalog-photo-editor"><label class="field">写真（任意）</label>'+
-      '<div class="catalog-photo-buttons">'+
-      '<label class="btn secondary smallbtn catalog-photo-button">📷 撮影する<input type="file" name="photo_camera" accept="image/*" capture="environment" data-action="catalog-photo-select" class="catalog-photo-input"></label>'+
-      '<label class="btn secondary smallbtn catalog-photo-button">🖼️ 写真を選ぶ<input type="file" name="photo_library" accept="image/*" data-action="catalog-photo-select" class="catalog-photo-input"></label>'+
-      '</div><div class="catalog-photo-preview-box"'+(isCatalogPhotoPath(x.image)?"":" hidden")+'><img id="catalog-photo-preview" alt="写真の表示位置プレビュー" hidden><span class="tiny">表示イメージ</span></div><div id="catalog-photo-position-fields"'+(isCatalogPhotoPath(x.image)?"":" hidden")+'><input type="hidden" id="catalog-photo-position" name="image_position" value="'+esc(imagePosition(x.image_position))+'"><p class="tiny" id="catalog-position-hint">写真を指で動かして表示位置を調整できるよ。</p><button type="button" class="btn secondary smallbtn" data-action="catalog-photo-center">中央に戻す</button></div><p class="tiny catalog-photo-status" id="catalog-photo-status" role="status" aria-live="polite" aria-atomic="true" data-phase="idle">'+(x.image?"写真を登録済み。別の写真を選ぶと差し替えられるよ。":"写真を選ばなくても登録できるよ。")+'</p>'+
+      '<input type="file" name="photo" accept="image/*" data-action="catalog-photo-select" class="input catalog-photo-picker" aria-label="写真を選択">'+
+      '<p class="tiny">「ファイルを選択」から、撮影・写真ライブラリ・ファイルを選べるよ。</p>'+
+      '<div class="catalog-photo-preview-box"'+(isCatalogPhotoPath(x.image)?"":" hidden")+'><img id="catalog-photo-preview" alt="写真の表示位置プレビュー" hidden><span class="tiny">表示イメージ</span></div><div id="catalog-photo-position-fields"'+(isCatalogPhotoPath(x.image)?"":" hidden")+'><input type="hidden" id="catalog-photo-position" name="image_position" value="'+esc(imagePosition(x.image_position))+'"><p class="tiny" id="catalog-position-hint">写真を指で動かして表示位置を調整できるよ。</p><button type="button" class="btn secondary smallbtn" data-action="catalog-photo-center">中央に戻す</button></div><p class="tiny catalog-photo-status" id="catalog-photo-status" role="status" aria-live="polite" aria-atomic="true" data-phase="idle">'+(x.image?"写真を登録済み。別の写真を選ぶと差し替えられるよ。":"写真を選ばなくても登録できるよ。")+'</p>'+
       (x.image?'<label class="catalog-check"><input type="checkbox" name="remove_photo" data-action="catalog-remove-photo">写真を外す</label>':"")+
       '</div>'+
       '<details class="catalog-date-fields"'+((x.arrived_on||x.released_on)?" open":"")+'><summary>日付を入力（任意）</summary>'+
