@@ -37,7 +37,7 @@
   };
   const state={client:null,user:null,role:null,tab:"dashboard",daily:[],shopping:[],cleaning:[],members:[],
     month:isoToday().slice(0,7),mode:"schedule",monthCache:null,monthRows:new Map(),draft:new Map(),opened:new Set(),
-    tasks:[],shoppingCategory:"食品",showCompleted:false,catalog:[],catalogGenre:"パパ"};
+    tasks:[],shoppingCategory:"食品",showCompleted:false,catalog:[],catalogGenre:"ホーム"};
   let toastTimeout;
   const check = r => {if(r.error)throw r.error;return r.data;};
   const errorText=e=>e?.message||String(e);
