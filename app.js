@@ -277,7 +277,7 @@
   }
   async function signOut(){
     const r=await state.client.auth.signOut();check(r);
-    state.user=null;state.draft.clear();show("login");$("login-button").disabled=false;
+    state.user=null;state.draft.clear();state.catalogImageUrls.clear();show("login");$("login-button").disabled=false;
   }
   async function refresh(){
     $("page-status").textContent="データを読み込み中…";
@@ -555,10 +555,11 @@
     document.querySelectorAll("#catalog-items img[data-image-path]").forEach(el=>{
       const entry=state.catalogImageUrls.get(el.dataset.imagePath);
       if(entry&&entry.expires>Date.now()){
+        const placeholder=el.parentElement.querySelector(".catalog-image-placeholder");
+        el.onload=()=>{if(placeholder)placeholder.hidden=true;};
+        el.onerror=()=>{el.hidden=true;if(placeholder)placeholder.hidden=false;};
         el.src=entry.url;
         el.hidden=false;
-        const placeholder=el.parentElement.querySelector(".catalog-image-placeholder");
-        if(placeholder)placeholder.hidden=true;
       }
     });
   }
@@ -571,8 +572,10 @@
   }
   async function removeCatalogPhoto(path){
     if(!isCatalogPhotoPath(path))return;
-    const result=await state.client.storage.from(catalogPhotoBucket).remove([path]);
-    if(result.error)console.warn("Photo cleanup:",result.error);
+    try{
+      const result=await state.client.storage.from(catalogPhotoBucket).remove([path]);
+      if(result.error)console.warn("Photo cleanup:",result.error);
+    }catch(e){console.warn("Photo cleanup:",e);}
     state.catalogImageUrls.delete(path);
   }
   function renderCatalog(){
