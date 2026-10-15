@@ -15,9 +15,11 @@
   const safeHref=str=>{
     try{const u=new URL(String(str||""));return ["https:","http:"].includes(u.protocol)&&!u.username&&!u.password?u.href:"";}catch{return "";}
   };
+  const todayTokyo=()=>{const parts=new Intl.DateTimeFormat("en-US",{timeZone:"Asia/Tokyo",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date());const p=x=>parts.find(v=>v.type===x).value;return p("year")+"-"+p("month")+"-"+p("day");};
   const fileExt=f=>(f.type==="application/pdf"||/\.pdf$/i.test(f.name))?"pdf":"jpg";
   function say(message,isError=false){
-    const node=$("notes-feedback");if(node){node.textContent=message;node.className="small"+(isError?" notes-error":"");}
+    const node=$("notes-save-status")&&!$("notes-overlay").hidden?$("notes-save-status"):$("notes-feedback");
+    if(node){node.textContent=message;node.className="small"+(isError?" notes-error":"");}
   }
   function dialog(html){
     $("notes-dialog-content").innerHTML=html;$("notes-overlay").hidden=false;
@@ -177,7 +179,7 @@
       '<div id="notes-link-entries"></div><label class="field" for="notes-link-title">リンク名</label>'+
       '<input class="input" id="notes-link-title" placeholder="例：保育園の公式サイト" maxlength="150">'+
       '<label class="field" for="notes-link-url">WebページのURL</label>'+
-      '<input class="input" id="notes-link-url" type="url" placeholder="https://...">'+
+      '<input class="input" id="notes-link-url" type="text" inputmode="url" placeholder="https://...">'+
       '<button type="button" class="btn secondary smallbtn" data-note-action="add-link">＋ Webリンクを追加</button>'+
       '<label class="field" for="notes-catalog-item">図鑑の品目を関連付ける</label>'+
       '<div class="notes-link-form"><select class="input" id="notes-catalog-item"><option value="">品目を選んでね</option>'+
@@ -279,7 +281,7 @@
       if(action==="new")edit(null);
       if(action==="edit")edit(button.dataset.id);
       if(action==="close")close();
-      if(action==="today")$("notes-checked_on").value=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Tokyo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+      if(action==="today")$("notes-checked_on").value=todayTokyo();
       if(action==="unlink"){editorLinks=editorLinks.filter(l=>l.id!==button.dataset.id);editorLinkList();}
       if(action==="unqueue"){queued.splice(Number(button.dataset.index),1);editorFiles();}
       if(action==="remove-file"){removed.add(button.dataset.id);editorFiles();}
@@ -307,7 +309,6 @@
     document.addEventListener("click",onClick);
     $("notes-search").addEventListener("input",e=>{query=e.target.value;renderList();});
     $("notes-sort").addEventListener("change",e=>{sort=e.target.value;renderList();});
-    $("notes-file-picker"); // File input is dynamically created when editing.
     document.addEventListener("change",e=>{
       if(e.target.id!=="notes-file-picker"||mode!=="edit")return;
       for(const file of e.target.files||[]){
