@@ -4,16 +4,18 @@
   const cfg = window.FD_CONFIG || {};
   const person = {kai:"カイ",papa:"パパ",mama:"ママ",event:"イベント",lunch:"給食"};
   const fields = ["kai","papa","mama","event"];
+  // One shared genre list and one canonical category field for both screens.
   const catalogGenres=[
-    {name:"パパ",icon:"👨"},{name:"ママ",icon:"👩"},{name:"カイ",icon:"👦"},
-    {name:"炊事",icon:"🍳"},{name:"生活雑貨",icon:"🧴"},{name:"家",icon:"🏠"},
-    {name:"キャンプ",icon:"🏕️"},{name:"食品",icon:"🥬"}
+    {name:"ホーム",icon:"🏠"},{name:"パパ",icon:"👨"},
+    {name:"ママ",icon:"👩"},{name:"カイ",icon:"👦"},
+    {name:"食品",icon:"🥬"},{name:"生活雑貨",icon:"🧴"},
+    {name:"炊事",icon:"🍳"},{name:"アウトドア",icon:"🏕️"}
   ];
+  const genreAliases={"家":"ホーム","キャンプ":"アウトドア","雑貨":"生活雑貨","育児":"カイ"};
   function itemGenre(x){
-    if(catalogGenres.some(g=>g.name===x.catalog_genre))return x.catalog_genre;
-    if(x.category==="雑貨")return "生活雑貨";
-    if(x.category==="育児")return "カイ";
-    return catalogGenres.some(g=>g.name===x.category)?x.category:"生活雑貨";
+    const original=x.category||x.catalog_genre||"";
+    const genre=genreAliases[original]||original;
+    return catalogGenres.some(g=>g.name===genre)?genre:"生活雑貨";
   }
   const esc = v => String(v == null ? "" : v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const isoToday = () => {
@@ -354,7 +356,7 @@
       (t==null?"–":esc(t))+"℃"+gap+rain+"%"+umbrella;
   }
   function shoppingRow(x,brief=false){
-    return '<div class="itemrow"><label class="checkboxlabel"><input type="checkbox" data-action="shopping-needed" data-id="'+esc(x.id)+'" '+(x.needed?"checked":"")+'><span class="itemmain"><span class="item-title">'+esc(x.product)+'</span><span class="item-sub" style="display:block">'+esc(brief?(x.note||""):[x.note,x.store].filter(Boolean).join(" · "))+'</span></span></label>'+
+    return '<div class="itemrow"><label class="checkboxlabel"><input type="checkbox" data-action="shopping-needed" data-id="'+esc(x.id)+'" '+(x.needed?"checked":"")+'><span class="itemmain"><span class="item-title">'+esc(x.product)+'</span><span class="item-sub" style="display:block">'+esc(x.note||"")+'</span></span></label>'+
       (brief?"":'<button type="button" class="btn secondary smallbtn" data-action="edit-shopping" data-id="'+esc(x.id)+'">編集</button>')+'</div>';
   }
   function filledAgendaFields(row){
@@ -483,11 +485,10 @@
     renderShopping();renderCleaning();
   }
   function renderShopping(){
-    const cats=["食品","雑貨","育児",...state.shopping.map(x=>String(x.category||"").trim()||"未分類")]
-      .filter((x,i,a)=>a.indexOf(x)===i);
+    const cats=catalogGenres.map(g=>g.name);
     if(!cats.includes(state.shoppingCategory))state.shoppingCategory="食品";
     $("shopping-categories").innerHTML=cats.map(cat=>'<button type="button" data-action="shopping-category" data-category="'+esc(cat)+'" class="category-pill'+(state.shoppingCategory===cat?" active":"")+'">'+esc(cat)+'</button>').join("");
-    const rows=state.shopping.filter(x=>(String(x.category||"").trim()||"未分類")===state.shoppingCategory);
+    const rows=state.shopping.filter(x=>itemGenre(x)===state.shoppingCategory);
     $("shopping-items").innerHTML=rows.length?rows.map(x=>shoppingRow(x)).join(""):'<p class="empty">このカテゴリの商品はありません</p>';
   }
 
@@ -505,7 +506,7 @@
     const rows=all.filter(x=>itemGenre(x)===selected.name).sort((a,b)=>String(a.product).localeCompare(String(b.product),"ja"));
     $("catalog-current-count").textContent=rows.length+"品目";
     $("catalog-items").innerHTML=rows.map(x=>{
-      const detail=[x.shopping_list?"🛒 買い物リストに登録":null,x.needed?"今買うもの":null,x.arrived_on?"来た日 "+x.arrived_on:null,x.released_on?"手放した日 "+x.released_on:null].filter(Boolean).join(" · ");
+      const detail=[x.shopping_list?"🛒 買い物リストに登録":null,x.needed?"今買うもの":null,x.arrived_on?"来た日 "+x.arrived_on:null,x.released_on?"手放した日 "+x.released_on:null,x.note||null].filter(Boolean).join(" · ");
       return '<div class="catalog-row"><div class="catalog-row-main"><div class="catalog-item-name">'+esc(x.product)+'</div>'+(detail?'<div class="catalog-item-meta">'+esc(detail)+'</div>':"")+'</div><button class="btn secondary smallbtn" type="button" data-action="edit-catalog" data-id="'+esc(x.id)+'">編集</button></div>';
     }).join("")||'<p class="empty">まだ品目はありません。上の入力欄から登録できるよ。</p>';
   }
@@ -518,7 +519,7 @@
     try{
       check(await state.client.from("shopping").insert({
         id:"catalog-"+(crypto.randomUUID?.()||String(Date.now())+Math.random().toString(36).slice(2)),
-        product,category:genre,catalog_genre:genre,shopping_list:false,
+        product,category:genre,shopping_list:false,
         needed:false,quick_display:false,updated_at:new Date().toISOString()
       }));
       form.reset();await refresh();toast("図鑑に登録したよ");
@@ -531,9 +532,10 @@
     const genre=itemGenre(x);
     const html='<form id="modal-form" data-kind="catalog"><input type="hidden" name="id" value="'+esc(id)+'">'+
       '<label class="field">品名</label><input name="product" class="input" required maxlength="150" value="'+esc(x.product)+'">'+
-      '<label class="field">図鑑のジャンル</label><select class="input" name="catalog_genre">'+catalogGenres.map(g=>'<option value="'+esc(g.name)+'"'+(g.name===genre?" selected":"")+'>'+esc(g.name)+'</option>').join("")+'</select>'+
+      '<label class="field">ジャンル</label><select class="input" name="category">'+catalogGenres.map(g=>'<option value="'+esc(g.name)+'"'+(g.name===genre?" selected":"")+'>'+esc(g.name)+'</option>').join("")+'</select>'+
       '<label class="catalog-check"><input type="checkbox" name="shopping_list" data-action="catalog-shopping-list" '+(x.shopping_list?"checked":"")+'>買い物リストに登録（リピート用）</label>'+
       '<label class="catalog-check"><input type="checkbox" name="needed" '+(x.needed?"checked":"")+' '+(!x.shopping_list?"disabled":"")+'>今、買うもの</label>'+
+      '<label class="field">メモ（任意）</label><textarea name="note" rows="3">'+esc(x.note||"")+'</textarea>'+
       '<details class="catalog-date-fields"'+((x.arrived_on||x.released_on)?" open":"")+'><summary>日付を入力（任意）</summary>'+
       '<label class="field">来た日</label><input type="date" class="input" name="arrived_on" value="'+esc(x.arrived_on||"")+'">'+
       '<label class="field">手放した日</label><input type="date" class="input" name="released_on" value="'+esc(x.released_on||"")+'"></details></form>';
@@ -566,13 +568,11 @@
   }
   async function editShopping(id){
     const x=state.shopping.find(a=>a.id===id)||{};
-    const category=x.category||state.shoppingCategory||"食品";
-    const categories=["食品","雑貨","育児",...state.shopping.map(x=>x.category).filter(Boolean),category].filter((v,i,a)=>a.indexOf(v)===i);
+    const category=id?itemGenre(x):state.shoppingCategory;
     const html='<form id="modal-form" data-kind="shopping"><input type="hidden" name="id" value="'+esc(id||"")+'">'+
       '<label class="field" for="shopping-product">商品名</label><input class="input" name="product" id="shopping-product" value="'+esc(x.product||"")+'" required maxlength="150">'+
-      '<label class="field">カテゴリ</label><select class="input" name="category">'+categories.map(c=>'<option value="'+esc(c)+'" '+(c===category?"selected":"")+'>'+esc(c)+'</option>').join("")+'</select>'+
-      '<label class="field">購入場所</label><input class="input" name="store" value="'+esc(x.store||"")+'">'+
-      '<label class="field">メモ</label><textarea name="note" rows="3">'+esc(x.note||"")+'</textarea></form>';
+      '<label class="field">ジャンル</label><select class="input" name="category">'+catalogGenres.map(g=>'<option value="'+esc(g.name)+'" '+(g.name===category?"selected":"")+'>'+esc(g.name)+'</option>').join("")+'</select>'+
+      '<label class="field">メモ（購入場所など）</label><textarea name="note" rows="3">'+esc(x.note||"")+'</textarea></form>';
     modal(id?"商品を編集":"買い物を追加",html,actions());
   }
   async function editTask(id){
@@ -665,7 +665,7 @@
   async function completeShopping(el){
     el.disabled=true;
     try{
-      check(await state.client.from("shopping").update({needed:false,last_bought:isoToday(),updated_at:new Date().toISOString()}).eq("id",el.dataset.id));
+      check(await state.client.from("shopping").update({needed:false,updated_at:new Date().toISOString()}).eq("id",el.dataset.id));
       await refresh();toast("買い物を完了したよ！");
     }catch(e){el.checked=false;report(e,"購入更新: ");}
     finally{el.disabled=false;}
@@ -746,18 +746,20 @@
         savedTaskId=saved.id;
       }else if(kind==="shopping"){
         const id=String(fd.get("id")||"");
-        const props={product:String(fd.get("product")||"").trim(),category:String(fd.get("category")||"").trim()||null,store:String(fd.get("store")||"").trim()||null,note:String(fd.get("note")||"").trim()||null,updated_at:new Date().toISOString()};
+        const props={product:String(fd.get("product")||"").trim(),category:String(fd.get("category")||"").trim(),note:String(fd.get("note")||"").trim()||null,updated_at:new Date().toISOString()};
+        if(!catalogGenres.some(g=>g.name===props.category))throw Error("ジャンルを確認してね");
         if(!props.product||props.product.length>150)throw Error("品名は1〜150文字で入力してね");
         if(state.shopping.some(x=>x.id===id))check(await state.client.from("shopping").update(props).eq("id",id));
         else check(await state.client.from("shopping").insert({...props,id:"item-"+(crypto.randomUUID?.()||String(Date.now())+Math.random().toString(36).slice(2)),shopping_list:true,needed:true,quick_display:true,sort_order:Math.max(0,...state.shopping.map(x=>Number(x.sort_order)||0))+1}));
       }else if(kind==="catalog"){
         if(state.role!=="admin")throw Error("図鑑は管理者専用です");
         const id=String(fd.get("id")||""),product=String(fd.get("product")||"").trim();
-        const genre=String(fd.get("catalog_genre")||""),listed=fd.get("shopping_list")==="on";
+        const genre=String(fd.get("category")||""),listed=fd.get("shopping_list")==="on";
         if(!state.catalog.some(x=>x.id===id))throw Error("品目が見つかりません");
         if(!product||product.length>150)throw Error("品名は1〜150文字で入力してね");
         if(!catalogGenres.some(g=>g.name===genre))throw Error("ジャンルを確認してね");
-        const props={product,catalog_genre:genre,shopping_list:listed,needed:listed&&fd.get("needed")==="on",
+        const props={product,category:genre,shopping_list:listed,needed:listed&&fd.get("needed")==="on",
+          note:String(fd.get("note")||"").trim()||null,
           arrived_on:String(fd.get("arrived_on")||"")||null,released_on:String(fd.get("released_on")||"")||null,updated_at:new Date().toISOString()};
         check(await state.client.from("shopping").update(props).eq("id",id).select("id").single());
       }
