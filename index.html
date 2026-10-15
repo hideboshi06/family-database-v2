@@ -7,9 +7,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Family DB">
 <link rel="manifest" href="./manifest.webmanifest">
-<meta name="description" content="Family Database v2 — 家族の予定・給食・掃除・買い物">
+<meta name="description" content="Family Database v2 — 家族の予定・給食・掃除・買い物・家族ノート">
 <title>Family Database</title>
-<link rel="stylesheet" href="./styles.css?v=20261015-photo-drag">
+<link rel="stylesheet" href="./styles.css?v=20261015-family-notes">
 </head>
 <body>
 <!-- Compatibility for older cached app.js versions; never shown to the user. -->
@@ -196,6 +196,28 @@
       </section>
     </div>
 
+    <div id="page-notes" class="page" hidden>
+      <h1 class="section-page-title">📖 家族ノート</h1>
+      <p class="small notes-lead">やりたいこと・困ったことから探せる、家族の行動ガイド。</p>
+      <section class="card">
+        <div class="between">
+          <h2>行動を探す</h2><button type="button" class="btn smallbtn" data-note-action="new">＋ ノート</button>
+        </div>
+        <label class="field" for="notes-search">キーワード検索</label>
+        <input class="input" id="notes-search" type="search" placeholder="カレー・登園・風呂掃除など" autocomplete="off">
+        <div id="notes-genres" class="notes-genres"></div>
+        <div class="between notes-sort-row">
+          <span class="small" id="notes-total">0件</span>
+          <select class="input" id="notes-sort" aria-label="並び順">
+            <option value="updated">更新が新しい順</option>
+            <option value="title">タイトル順</option>
+          </select>
+        </div>
+        <div id="notes-list" class="notes-list"><p class="empty">家族ノートを読み込み中…</p></div>
+        <p class="small" id="notes-feedback" role="status" aria-live="polite"></p>
+      </section>
+    </div>
+
     <div id="page-settings" class="page">
       <section class="card">
         <div class="between"><h2>設定</h2><button type="button" class="btn secondary smallbtn" data-action="logout">ログアウト</button></div>
@@ -251,6 +273,7 @@
       <button type="button" data-tab="dashboard" class="active"><span class="ico">📅</span>スケジュール</button>
       <button type="button" data-tab="todo"><span class="ico">☑️</span>やること</button>
       <button type="button" data-tab="catalog" id="catalog-tab" hidden><span class="ico">📚</span>図鑑</button>
+      <button type="button" data-tab="notes"><span class="ico">📖</span>ノート</button>
        <button type="button" data-tab="settings"><span class="ico">⚙️</span>設定</button>
     </nav>
   </div>
@@ -264,10 +287,16 @@
     <div id="modal-actions" class="modal-actions"></div>
   </div>
 </div>
+<div id="notes-overlay" class="overlay notes-overlay" hidden>
+  <div class="sheetmodal notes-sheetmodal" role="dialog" aria-modal="true" aria-label="家族ノート">
+    <div id="notes-dialog-content"></div>
+  </div>
+</div>
 <div id="toast" role="status" class="toast" hidden></div>
 
 <script>window.FD_CONFIG = {url:"https://besevrrmhwmkdqmoiscf.supabase.co",key:"sb_publishable_oo7Bdb8Ip-icb6Y0nqovKg_OH9Taql2"};</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="./app.js?v=20261015-photo-drag" defer></script>
+<script src="./app.js?v=20261015-family-notes" defer></script>
+<script src="./notes.js?v=20261015-family-notes" defer></script>
 </body>
 </html>
