@@ -87,10 +87,13 @@
     }).join("");
   }
   function fileRow(f,url){
-    const title=esc(f.file_name);
-    if(!url)return '<span class="notes-link">📄 '+title+'（準備中…）</span>';
-    return '<a href="'+esc(url)+'" class="notes-link" target="_blank" rel="noopener noreferrer">'+
-      (f.mime_type==="application/pdf"?"📄 ":"🖼️ ")+title+(f.mime_type==="application/pdf"?"（開いて印刷）":"（開く）")+'</a>';
+    const title=esc(f.file_name),isImage=f.mime_type==="image/jpeg";
+    if(!url)return '<span class="notes-link">'+(isImage?"🖼️ ":"📄 ")+title+'（読み込み中…）</span>';
+    const safe=esc(url);
+    if(isImage)return '<a href="'+safe+'" class="notes-photo-link" target="_blank" rel="noopener noreferrer" aria-label="'+title+'を開く">'+
+      '<img class="notes-photo-thumb" src="'+safe+'" alt="'+title+'のサムネイル" loading="lazy" decoding="async">'+
+      '<span class="notes-photo-caption">'+title+'</span></a>';
+    return '<a href="'+safe+'" class="notes-link" target="_blank" rel="noopener noreferrer">📄 '+title+'（開いて印刷）</a>';
   }
   async function fillFileLinks(id){
     const entries=files.filter(f=>f.note_id===id);
@@ -123,7 +126,9 @@
       '<h2 class="notes-detail-title">'+(n.pinned?"📌 ":"")+esc(n.title)+'</h2>'+
       section("どんなとき？",n.description?asText(n.description):"")+
       section("準備するもの",ingredients.length?'<ul class="notes-plain-list">'+ingredients.map(x=>'<li>'+esc(x)+'</li>').join("")+'</ul>':"")+
-      section("手順",steps.length?'<ol class="notes-steps">'+steps.map(x=>'<li><label><input type="checkbox"><span>'+esc(x)+'</span></label></li>').join("")+'</ol>':"")+
+      section("手順",steps.length?'<div class="notes-steps" role="list">'+steps.map((x,i)=>
+        '<div class="notes-step" role="listitem"><label><input type="checkbox"><span class="notes-step-index">'+(i+1)+'.</span><span class="notes-step-text">'+esc(x)+'</span></label></div>'
+      ).join("")+'</div>':"")+
       section("連絡先",n.contacts?'<div class="notes-paragraph">'+contactHtml(n.contacts)+'</div>':"")+
       section("PDF・写真",attach.length?'<div class="notes-links" id="notes-attachment-links">'+attach.map(f=>fileRow(f,fileUrls.get(f.storage_path)?.url)).join("")+'</div><p class="tiny">PDFは開いたあと、iPhone・iPadの共有メニューから「プリント」を選んでね。</p>':"")+
       section("関連リンク・図鑑",relationHtml(id)?'<div class="notes-links">'+relationHtml(id)+'</div>':"")+
