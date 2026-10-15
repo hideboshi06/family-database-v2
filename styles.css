@@ -436,3 +436,6 @@ details.help summary{color:var(--navy);cursor:pointer;font-size:12px}
 .catalog-photo-editor .tiny{line-height:1.5;overflow-wrap:anywhere}
 .catalog-photo-editor .catalog-check{font-weight:500}
 @media(min-width:690px){.catalog-items{grid-template-columns:repeat(4,minmax(0,1fr))}}
+
+/* Let the image overlay the placeholder only after the file starts loading. */
+.catalog-imagebox .catalog-thumb{position:absolute;inset:0}
