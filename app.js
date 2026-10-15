@@ -45,6 +45,8 @@
     tasks:[],shoppingCategory:"食品",showCompleted:false,catalog:[],catalogGenre:"ホーム",
     catalogImageUrls:new Map()};
   let toastTimeout;
+  let catalogPhotoPrep=null;
+  let catalogPhotoRevision=0;
   const check = r => {if(r.error)throw r.error;return r.data;};
   const errorText=e=>e?.message||String(e);
   function toast(message,isError=false){
@@ -54,6 +56,8 @@
   function report(e,prefix=""){console.error(prefix,e);toast(prefix+errorText(e),true);}
   function show(id){["loading","login","denied","main"].forEach(x=>$(x).hidden=(x!==id));}
   function modal(title,content,footer){
+    catalogPhotoRevision++;
+    catalogPhotoPrep=null;
     $("modal-title").textContent=title;
     $("modal-content").innerHTML=content;
     $("modal-actions").innerHTML=footer;
@@ -61,7 +65,11 @@
     $("modal-save-status").textContent="";
     $("modal").hidden=false;
   }
-  function closeModal(){$("modal").hidden=true;$("modal-content").innerHTML="";}
+  function closeModal(){
+    catalogPhotoRevision++;
+    catalogPhotoPrep=null;
+    $("modal").hidden=true;$("modal-content").innerHTML="";
+  }
   // Use a real click handler instead of a form-associated button outside the form:
   // iOS Safari standalone/webview may not dispatch submit for that layout.
   function actions(){return '<button class="btn secondary" type="button" data-action="close">キャンセル</button><button class="btn" type="button" data-action="save-modal">保存</button>';}
@@ -570,6 +578,46 @@
     }
     return null;
   }
+
+  const photoSignature=file=>[file.name,file.size,file.lastModified,file.type].join("|");
+  const catalogPhotoStatus=(message,phase)=>{
+    const label=$("catalog-photo-status");
+    if(label){label.textContent=message;label.dataset.phase=phase||"";}
+  };
+  async function prepareSelectedCatalogPhoto(input){
+    const form=input.closest("form");
+    if(!form||form.dataset.kind!=="catalog")return;
+    const revision=++catalogPhotoRevision;
+    catalogPhotoPrep=null;
+    const save=$("modal-actions").querySelector('[data-action="save-modal"]');
+    const other=form.querySelector('input[data-action="catalog-photo-select"]:not([name="'+input.name+'"])');
+    if(other)other.value="";
+    const remove=form.querySelector('input[name="remove_photo"]');
+    if(remove)remove.checked=false;
+    const file=input.files?.[0];
+    if(!file){
+      if(save)save.disabled=false;
+      catalogPhotoStatus("写真は選ばれていないよ。","idle");
+      return;
+    }
+    if(save)save.disabled=true;
+    catalogPhotoStatus("⏳ 写真を読み込み・縮小中…（まだ保存されていないよ）","working");
+    // Allow the status to paint before iPhone starts decoding the full-resolution photo.
+    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+    try{
+      const blob=await resizeCatalogPhoto(file);
+      if(revision!==catalogPhotoRevision||$("modal-form")!==form)return;
+      catalogPhotoPrep={signature:photoSignature(file),blob};
+      catalogPhotoStatus("✅ 写真の準備完了（"+Math.max(1,Math.round(blob.size/1024))+"KB）。「保存」で登録できるよ。","ready");
+      if(save)save.disabled=false;
+    }catch(e){
+      if(revision!==catalogPhotoRevision||$("modal-form")!==form)return;
+      input.value="";
+      catalogPhotoPrep=null;
+      catalogPhotoStatus("⚠️ "+errorText(e)+" 別の写真を選んでね。","error");
+      if(save)save.disabled=false;
+    }
+  }
   async function removeCatalogPhoto(path){
     if(!isCatalogPhotoPath(path))return;
     try{
@@ -631,7 +679,7 @@
       '<div class="catalog-photo-buttons">'+
       '<label class="btn secondary smallbtn catalog-photo-button">📷 撮影する<input type="file" name="photo_camera" accept="image/*" capture="environment" data-action="catalog-photo-select" class="catalog-photo-input"></label>'+
       '<label class="btn secondary smallbtn catalog-photo-button">🖼️ 写真を選ぶ<input type="file" name="photo_library" accept="image/*" data-action="catalog-photo-select" class="catalog-photo-input"></label>'+
-      '</div><p class="tiny" id="catalog-photo-status">'+(x.image?"写真を登録済み。別の写真を選ぶと差し替えられるよ。":"写真を選ばなくても登録できるよ。")+'</p>'+
+      '</div><p class="tiny catalog-photo-status" id="catalog-photo-status" role="status" aria-live="polite" aria-atomic="true" data-phase="idle">'+(x.image?"写真を登録済み。別の写真を選ぶと差し替えられるよ。":"写真を選ばなくても登録できるよ。")+'</p>'+
       (x.image?'<label class="catalog-check"><input type="checkbox" name="remove_photo" data-action="catalog-remove-photo">写真を外す</label>':"")+
       '</div>'+
       '<details class="catalog-date-fields"'+((x.arrived_on||x.released_on)?" open":"")+'><summary>日付を入力（任意）</summary>'+
@@ -862,17 +910,19 @@
           arrived_on:String(fd.get("arrived_on")||"")||null,released_on:String(fd.get("released_on")||"")||null,updated_at:new Date().toISOString()};
         const existing=state.catalog.find(x=>x.id===id),file=chosenCatalogFile(fd);
         const removePhoto=fd.get("remove_photo")==="on";
+        if(file&&!removePhoto&&catalogPhotoPrep?.signature!==photoSignature(file))
+          throw Error("写真の準備が終わるまで待ってね");
         let uploadedPath=null;
         try{
           if(file&&!removePhoto){
-            status.textContent="写真を小さく整えています…";
-            const jpeg=await resizeCatalogPhoto(file);
             uploadedPath="items/"+id+"/"+(crypto.randomUUID?.()||String(Date.now())+Math.random().toString(36).slice(2))+".jpg";
-            status.textContent="写真を保存しています…";
-            check(await state.client.storage.from(catalogPhotoBucket).upload(uploadedPath,jpeg,
+            status.textContent="⏳ 写真をアップロード中…";
+            catalogPhotoStatus("⏳ 写真を保存中…","working");
+            check(await state.client.storage.from(catalogPhotoBucket).upload(uploadedPath,catalogPhotoPrep.blob,
               {contentType:"image/jpeg",cacheControl:"31536000",upsert:false}));
             props.image=uploadedPath;
           }else if(removePhoto)props.image=null;
+          status.textContent="⏳ 品目データを保存中…";
           check(await state.client.from("shopping").update(props).eq("id",id).select("id").single());
         }catch(error){
           if(uploadedPath)await removeCatalogPhoto(uploadedPath);
@@ -880,11 +930,13 @@
         }
         if((uploadedPath||removePhoto)&&existing.image)
           await removeCatalogPhoto(existing.image);
+        if(uploadedPath||removePhoto)status.textContent="✅ 写真の保存完了";
       }
       await refresh();
       if(savedTaskId&&!state.tasks.some(t=>t.id===savedTaskId))
         throw Error("保存できましたが一覧へ反映されません。ページを更新してください");
-      closeModal();toast("保存したよ！");
+      const withPhoto=kind==="catalog"&&(!!chosenCatalogFile(fd)||fd.get("remove_photo")==="on");
+      closeModal();toast(withPhoto?"✅ 写真の保存が完了したよ！":"保存したよ！");
     }catch(e){
       b.disabled=false;b.textContent="保存";
       status.textContent="保存できませんでした: "+errorText(e);status.hidden=false;status.classList.add("err");
@@ -936,19 +988,16 @@
   function change(e){
     const el=e.target;
     if(el.matches('input[data-action="catalog-photo-select"]')){
-      const form=el.closest("form");
-      const sibling=form?.querySelector('input[data-action="catalog-photo-select"]:not([name="'+el.name+'"])');
-      if(sibling)sibling.value="";
-      const remove=form?.querySelector('input[name="remove_photo"]');
-      if(remove)remove.checked=false;
-      const status=$("catalog-photo-status");
-      if(status&&el.files?.length)status.textContent=el.files[0].name+" を保存時に軽く整えるよ";
+      prepareSelectedCatalogPhoto(el).catch(e=>report(e,"画像準備: "));
     }
-    if(el.matches('input[data-action="catalog-remove-photo"]')&&el.checked){
+    if(el.matches('input[data-action="catalog-remove-photo"]')){
+      catalogPhotoRevision++;
+      catalogPhotoPrep=null;
       const form=el.closest("form");
-      form?.querySelectorAll('input[data-action="catalog-photo-select"]').forEach(input=>input.value="");
-      const status=$("catalog-photo-status");
-      if(status)status.textContent="保存すると写真を外すよ";
+      if(el.checked)form?.querySelectorAll('input[data-action="catalog-photo-select"]').forEach(input=>input.value="");
+      catalogPhotoStatus(el.checked?"写真の削除は「保存」で確定するよ。":"登録済みの写真をそのまま残すよ。","idle");
+      const save=$("modal-actions").querySelector('[data-action="save-modal"]');
+      if(save)save.disabled=false;
     }
     if(el.matches('input[data-action="catalog-shopping-list"]')){
       const needed=$("modal-form")?.querySelector('input[name="needed"]');
