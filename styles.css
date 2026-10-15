@@ -458,3 +458,9 @@ details.help summary{color:var(--navy);cursor:pointer;font-size:12px}
   border-radius:5px;padding:2px 6px
 }
 #catalog-photo-position{max-width:240px}
+
+/* Dragging changes only the visible part of the square; no image reprocessing. */
+.catalog-photo-preview-box{touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}
+.catalog-photo-preview-box.dragging{cursor:grabbing}
+.catalog-photo-preview-box img,.catalog-photo-preview-box>.tiny{pointer-events:none;-webkit-user-drag:none}
+#catalog-photo-position-fields .tiny{margin:7px 0;line-height:1.5}
