@@ -300,6 +300,7 @@
   }
   async function signOut(){
     const r=await state.client.auth.signOut();check(r);
+    window.FamilyNotes?.reset();
     state.user=null;state.draft.clear();state.catalogImageUrls.clear();show("login");$("login-button").disabled=false;
   }
   async function refresh(){
