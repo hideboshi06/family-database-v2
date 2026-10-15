@@ -444,9 +444,8 @@
     showOptional("tomorrow-lunch",next.lunch);
     showOptional("tomorrow-garbage",next.garbage);
 
-    // Future section is for scheduled family plans only, never garbage, cleaning or tasks.
-    const upcoming=Array.from({length:7},(_,i)=>dateAdd(today,i+2))
-      .filter(day=>filledAgendaFields(byDate.get(day)||{}).length>0);
+    // Always show all seven days from the day after tomorrow, including days without plans.
+    const upcoming=Array.from({length:7},(_,i)=>dateAdd(today,i+2));
     $("future-card").hidden=!upcoming.length;
     $("schedule-list").innerHTML=upcoming.map(day=>agendaDetails(day,byDate.get(day)||{})).join("");
   }
