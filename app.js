@@ -845,16 +845,15 @@
     const entries=arr.map(day=>{
       const changed=state.draft.has(day),opened=state.opened.has(day);
       const preview=f.map(k=>monthValue(day,k)).filter(Boolean).map(x=>String(x).replace(/\s+/g," ").slice(0,20)).join(" / ");
-      return '<div class="monthday'+(changed?" dirty":"")+(arr.length===31&&day===arr[30]?" monthday-last":"")+'"><button type="button" class="monthtop" data-action="expand-day" data-day="'+day+'"><span class="monthdate '+weekend(day)+'">'+fmtDay(day)+(holidayName(day)?'<span class="holiday-name month-holiday">'+esc(holidayName(day))+'</span>':"")+(changed?'<span class="changedmark">変更</span>':"")+'</span><span class="monthpreview">'+esc(preview||"未入力")+'</span><span class="tiny">'+(opened?"▲":"▼")+'</span></button>'+
+      return '<div class="monthday'+(changed?" dirty":"")+'"><button type="button" class="monthtop" data-action="expand-day" data-day="'+day+'"><span class="monthdate '+weekend(day)+'">'+fmtDay(day)+(holidayName(day)?'<span class="holiday-name month-holiday">'+esc(holidayName(day))+'</span>':"")+(changed?'<span class="changedmark">変更</span>':"")+'</span><span class="monthpreview">'+esc(preview||"未入力")+'</span><span class="tiny">'+(opened?"▲":"▼")+'</span></button>'+
         (opened?'<div class="monthfields">'+f.map(k=>'<label class="field">'+person[k]+'</label><textarea data-month-field="'+k+'" data-day="'+day+'" rows="'+(k==="lunch"?5:2)+'" placeholder="'+person[k]+'を入力・貼り付け">'+esc(monthValue(day,k))+'</textarea>').join("")+
           (state.mode==="schedule"?agendaUrlEditor(key=>monthValue(day,key),day):"")+'</div>':"")+'</div>';
     });
-    // On wide screens: 1–15 (+31, if present) on the left, 16–30 on the right.
-    // Mobile uses CSS display:contents + order to keep 1–31 chronological.
-    // Independent desktop columns prevent expanded cards from stretching their neighbors.
+    // On wide screens: 1–15 on the left, 16–the month's last day on the right.
+    // On mobile, display:contents preserves chronological order in one column.
+    // Independent desktop columns avoid empty gaps when a day is expanded.
     const left=entries.slice(0,15);
-    if(entries.length===31)left.push(entries[30]);
-    const right=entries.slice(15,Math.min(30,entries.length));
+    const right=entries.slice(15);
     $("month-days").innerHTML=
       '<div class="month-column">'+left.join("")+'</div>'+
       '<div class="month-column">'+right.join("")+'</div>';
