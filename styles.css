@@ -65,7 +65,6 @@ label.field{font-size:12px;color:#526679;font-weight:700;display:block;margin:10
 .choice button.active{background:var(--navy);color:#fff}
 .month-list{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;align-items:start}
 .month-column{display:contents}
-.monthday-last{order:1}
 .monthday{border:1px solid var(--line);border-radius:11px;overflow:hidden;background:#fff}
 .monthtop{display:flex;align-items:center;justify-content:space-between;padding:11px 12px;gap:9px;width:100%;background:#fff;border:0;text-align:left}
 .monthdate{font-weight:750;font-size:13px}
