@@ -842,13 +842,19 @@
     $("month-title").textContent=Number(state.month.slice(0,4))+"年"+Number(state.month.slice(5))+"月";
     $("mode-schedule").classList.toggle("active",state.mode==="schedule");
     $("mode-lunch").classList.toggle("active",state.mode==="lunch");
-    $("month-days").innerHTML=arr.map(day=>{
+    const entries=arr.map(day=>{
       const changed=state.draft.has(day),opened=state.opened.has(day);
       const preview=f.map(k=>monthValue(day,k)).filter(Boolean).map(x=>String(x).replace(/\s+/g," ").slice(0,20)).join(" / ");
       return '<div class="monthday'+(changed?" dirty":"")+'"><button type="button" class="monthtop" data-action="expand-day" data-day="'+day+'"><span class="monthdate '+weekend(day)+'">'+fmtDay(day)+(holidayName(day)?'<span class="holiday-name month-holiday">'+esc(holidayName(day))+'</span>':"")+(changed?'<span class="changedmark">変更</span>':"")+'</span><span class="monthpreview">'+esc(preview||"未入力")+'</span><span class="tiny">'+(opened?"▲":"▼")+'</span></button>'+
         (opened?'<div class="monthfields">'+f.map(k=>'<label class="field">'+person[k]+'</label><textarea data-month-field="'+k+'" data-day="'+day+'" rows="'+(k==="lunch"?5:2)+'" placeholder="'+person[k]+'を入力・貼り付け">'+esc(monthValue(day,k))+'</textarea>').join("")+
           (state.mode==="schedule"?agendaUrlEditor(key=>monthValue(day,key),day):"")+'</div>':"")+'</div>';
-    }).join("");
+    });
+    // Keep dates in reading order: down the first column, then down the second.
+    // Each column has its own row heights, so expanded days do not stretch the other column.
+    const midpoint=Math.ceil(entries.length/2);
+    $("month-days").innerHTML=
+      '<div class="month-column">'+entries.slice(0,midpoint).join("")+'</div>'+
+      '<div class="month-column">'+entries.slice(midpoint).join("")+'</div>';
     updateCount();
   }
   function updateCount(){
