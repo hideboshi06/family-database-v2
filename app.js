@@ -155,7 +155,7 @@
     if(res.error){
       let reason="";
       try{reason=(await res.error.context?.json())?.error||"";}catch{}
-      const readable={no_registered_device:"先に管理者の端末を登録してください。",
+      const readable={no_registered_device:"通知を受け取る家族の端末を設定から登録してね。",
         backend_missing:"サーバー設定を確認してください。",
         login_required:"再ログインしてください。",
         admin_only:"管理者専用の操作です。"};
