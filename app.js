@@ -186,14 +186,17 @@
   function noteShoppingChange(id,needed,product){
     if(!state.user||!/^[-a-zA-Z0-9_]{1,120}$/.test(String(id)))return;
     shoppingPending[id]={id,needed:!!needed,product:String(product||"").slice(0,150)};
-    storeShoppingPending();renderShoppingPending();
+    storeShoppingPending();
+    $("shopping-notify-status").textContent="";
+    renderShoppingPending();
   }
   function renderShoppingPending(){
     const panel=$("shopping-notify-panel");if(!panel)return;
     const changes=Object.values(shoppingPending);
     panel.hidden=!changes.length;
-    const summary=$("shopping-notify-summary"),count=$("shopping-notify-count"),button=$("shopping-notify-send");
-    if(!changes.length){count.textContent="";summary.textContent="";button.disabled=false;return;}
+    const summary=$("shopping-notify-summary"),count=$("shopping-notify-count");
+    const button=$("shopping-notify-send"),clear=$("shopping-notify-clear");
+    if(!changes.length){count.textContent="";summary.textContent="";button.disabled=false;clear.disabled=false;return;}
     const buying=changes.filter(x=>x.needed).map(x=>x.product);
     const bought=changes.filter(x=>!x.needed).map(x=>x.product);
     const names=arr=>arr.slice(0,4).join("、")+(arr.length>4?" ほか"+(arr.length-4)+"件":"");
@@ -203,7 +206,19 @@
     ].filter(Boolean).join("\n");
     count.textContent=changes.length+"件の変更が通知待ち";
     button.disabled=shoppingNotifyBusy;
+    clear.disabled=shoppingNotifyBusy;
     button.textContent=shoppingNotifyBusy?"送信中…":"🔔 家族全員に通知";
+  }
+  function clearShoppingPending(){
+    if(!state.user||shoppingNotifyBusy)return;
+    const count=Object.keys(shoppingPending).length;
+    if(!count)return;
+    if(!confirm(count+"件の通知待ちをクリアする？\n買い物リストの内容・チェック状態は変わらないよ。"))return;
+    shoppingPending={};
+    storeShoppingPending();
+    $("shopping-notify-status").textContent="";
+    renderShoppingPending();
+    toast("通知待ちだけクリアしたよ！");
   }
   async function sendShoppingPending(){
     if(shoppingNotifyBusy||!state.user)return;
@@ -1246,6 +1261,7 @@
       if(a==="reload"){location.reload();return;}
       if(a==="refresh"){await refresh();toast("更新したよ！");}
       if(a==="shopping-send-notice")await sendShoppingPending();
+      if(a==="shopping-clear-notice")clearShoppingPending();
       if(a==="save-notification-time")await saveNotificationTime();
       if(a==="register-push-device")await registerPushDevice();
       if(a==="remove-push-device")await removePushDevice();
