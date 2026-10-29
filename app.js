@@ -49,6 +49,8 @@
   let catalogPhotoRevision=0;
   let catalogPreviewObjectUrl=null;
   let catalogCardOpen=false;
+  let shoppingPending={};
+  let shoppingNotifyBusy=false;
   function releaseCatalogPreview(){if(catalogPreviewObjectUrl){URL.revokeObjectURL(catalogPreviewObjectUrl);catalogPreviewObjectUrl=null;}}
   const check = r => {if(r.error)throw r.error;return r.data;};
   const errorText=e=>e?.message||String(e);
@@ -124,6 +126,7 @@
       check(m);
       if(!m.data){$("denied-email").textContent=email;show("denied");return;}
       state.user=u.data.user;state.role=m.data.role;
+      shoppingPending=loadShoppingPending();
       window.FamilyNotes?.init({
         client:state.client,role:state.role,
         getCatalog:()=>state.role==="admin"?state.catalog:state.shopping,
@@ -138,7 +141,7 @@
       $("page-catalog").hidden=state.role!=="admin";
       $("catalog-tab").hidden=state.role!=="admin";
       $("notification-admin-controls").hidden=state.role!=="admin";
-      show("main");navigate("dashboard");
+      show("main");navigate(new URLSearchParams(location.search).get("from")==="shopping"?"todo":"dashboard");
       if("serviceWorker" in navigator)
         navigator.serviceWorker.register("./sw.js",{scope:"./"}).catch(e=>console.warn("Service Worker:",e));
       if(location.search.includes("code="))history.replaceState(null,"",location.pathname);
@@ -160,6 +163,80 @@
     }
     if(res.data?.error)throw Error(res.data.error);
     return res.data;
+  }
+
+  const shoppingPendingKey=()=>state.user?"fd-v2-shopping-pending-"+state.user.id:null;
+  function loadShoppingPending(){
+    if(!shoppingPendingKey())return {};
+    try{
+      const raw=JSON.parse(localStorage.getItem(shoppingPendingKey())||"{}"),out={};
+      if(!raw||typeof raw!=="object"||Array.isArray(raw))return out;
+      for(const [id,x] of Object.entries(raw))
+        if(/^[-a-zA-Z0-9_]{1,120}$/.test(id)&&x&&typeof x==="object"&&
+           typeof x.needed==="boolean"&&typeof x.product==="string")
+          out[id]={id,needed:x.needed,product:x.product.slice(0,150)};
+      return out;
+    }catch{return {};}
+  }
+  function storeShoppingPending(){
+    if(!shoppingPendingKey())return;
+    try{localStorage.setItem(shoppingPendingKey(),JSON.stringify(shoppingPending));}
+    catch(e){console.warn("Could not store pending shopping notifications",e);}
+  }
+  function noteShoppingChange(id,needed,product){
+    if(!state.user||!/^[-a-zA-Z0-9_]{1,120}$/.test(String(id)))return;
+    shoppingPending[id]={id,needed:!!needed,product:String(product||"").slice(0,150)};
+    storeShoppingPending();renderShoppingPending();
+  }
+  function renderShoppingPending(){
+    const panel=$("shopping-notify-panel");if(!panel)return;
+    const changes=Object.values(shoppingPending);
+    panel.hidden=!changes.length;
+    const summary=$("shopping-notify-summary"),count=$("shopping-notify-count"),button=$("shopping-notify-send");
+    if(!changes.length){count.textContent="";summary.textContent="";button.disabled=false;return;}
+    const buying=changes.filter(x=>x.needed).map(x=>x.product);
+    const bought=changes.filter(x=>!x.needed).map(x=>x.product);
+    const names=arr=>arr.slice(0,4).join("、")+(arr.length>4?" ほか"+(arr.length-4)+"件":"");
+    summary.textContent=[
+      buying.length?"買うもの："+names(buying):"",
+      bought.length?"買い物済み："+names(bought):""
+    ].filter(Boolean).join("\n");
+    count.textContent=changes.length+"件の変更が通知待ち";
+    button.disabled=shoppingNotifyBusy;
+    button.textContent=shoppingNotifyBusy?"送信中…":"🔔 家族全員に通知";
+  }
+  async function sendShoppingPending(){
+    if(shoppingNotifyBusy||!state.user)return;
+    const changes=Object.values(shoppingPending);
+    if(!changes.length)return;
+    if(!confirm(changes.length+"件の買い物変更を、送信者本人を含む通知登録済みの家族全員に送る？"))return;
+    shoppingNotifyBusy=true;renderShoppingPending();
+    const status=$("shopping-notify-status");
+    status.textContent="送信中…";
+    try{
+      // Ignore updates which have been superseded or deleted on another device.
+      const current=new Map(state.shopping.map(x=>[x.id,x]));
+      const valid=changes.filter(x=>current.get(x.id)?.needed===x.needed);
+      const stale=changes.filter(x=>!valid.includes(x));
+      for(const x of stale)if(shoppingPending[x.id]?.needed===x.needed)delete shoppingPending[x.id];
+      if(stale.length){storeShoppingPending();renderShoppingPending();}
+      if(!valid.length){status.textContent="他の端末で変更された品目を整理したよ。通知待ちはないよ。";return;}
+      const batch=valid.slice(0,40).map(x=>({id:x.id,needed:x.needed}));
+      const answer=await invokePush("shopping-summary",{changes:batch});
+      if(!answer?.sent)throw Error("通知できなかったよ。家族の通知登録を確認してね。");
+      if(answer.failed){
+        status.textContent=answer.sent+"台へ送れたけど、"+answer.failed+"台で失敗したよ。通知待ちは残すので、再送すると重複する場合があるよ。";
+        return;
+      }
+      const delivered=new Set(answer.notifiedIds||[]);
+      for(const x of batch)if(delivered.has(x.id)&&shoppingPending[x.id]?.needed===x.needed)delete shoppingPending[x.id];
+      storeShoppingPending();renderShoppingPending();
+      status.textContent=answer.sent+"台の端末へ通知したよ（本人も含む）。";
+      toast("買い物の変更を家族全員に通知したよ！");
+    }catch(error){
+      status.textContent="通知できなかったよ: "+errorText(error);
+      report(error,"買い物通知: ");
+    }finally{shoppingNotifyBusy=false;renderShoppingPending();}
   }
   function assertPushReady(){
     if(!("serviceWorker" in navigator)||!("Notification" in window)||!("PushManager" in window))
@@ -307,6 +384,7 @@
   async function signOut(){
     const r=await state.client.auth.signOut();check(r);
     window.FamilyNotes?.reset();
+    shoppingPending={};shoppingNotifyBusy=false;
     state.user=null;state.draft.clear();state.catalogImageUrls.clear();show("login");$("login-button").disabled=false;
   }
   async function refresh(){
@@ -528,7 +606,7 @@
     $("todo-show-completed").textContent="完了済み "+completed.length+"件 "+(state.showCompleted?"▲":"▼");
     $("todo-completed-list").hidden=!state.showCompleted||!completed.length;
     $("todo-completed-list").innerHTML=state.showCompleted?completed.map(t=>todoRow(t.title,taskDetail(t),"task",t.id,true)).join(""):"";
-    renderShopping();renderCleaning();
+    renderShopping();renderShoppingPending();renderCleaning();
   }
   function renderShopping(){
     const cats=["食品","生活雑貨","その他"];
@@ -1012,6 +1090,8 @@
     el.disabled=true;
     try{
       check(await state.client.from("shopping").update({needed:false,updated_at:new Date().toISOString()}).eq("id",el.dataset.id));
+      const item=state.shopping.find(x=>x.id===el.dataset.id);
+      if(item)noteShoppingChange(item.id,false,item.product);
       await refresh();toast("買い物を完了したよ！");
     }catch(e){el.checked=false;report(e,"購入更新: ");}
     finally{el.disabled=false;}
@@ -1039,6 +1119,8 @@
     const checked=el.checked;el.disabled=true;
     try{
       check(await state.client.from("shopping").update({needed:checked,updated_at:new Date().toISOString()}).eq("id",el.dataset.id));
+      const item=state.shopping.find(x=>x.id===el.dataset.id);
+      if(item)noteShoppingChange(item.id,checked,item.product);
       await refresh();toast("買い物リストを更新したよ！");
     }catch(e){el.checked=!checked;report(e,"買い物更新: ");}
     finally{el.disabled=false;}
@@ -1096,7 +1178,11 @@
         if(!catalogGenres.some(g=>g.name===props.category))throw Error("ジャンルを確認してね");
         if(!props.product||props.product.length>150)throw Error("品名は1〜150文字で入力してね");
         if(state.shopping.some(x=>x.id===id))check(await state.client.from("shopping").update(props).eq("id",id));
-        else check(await state.client.from("shopping").insert({...props,id:"item-"+(crypto.randomUUID?.()||String(Date.now())+Math.random().toString(36).slice(2)),shopping_list:true,needed:true,quick_display:true,sort_order:Math.max(0,...state.shopping.map(x=>Number(x.sort_order)||0))+1}));
+        else {
+          const newId="item-"+(crypto.randomUUID?.()||String(Date.now())+Math.random().toString(36).slice(2));
+          check(await state.client.from("shopping").insert({...props,id:newId,shopping_list:true,needed:true,quick_display:true,sort_order:Math.max(0,...state.shopping.map(x=>Number(x.sort_order)||0))+1}));
+          noteShoppingChange(newId,true,props.product);
+        }
       }else if(kind==="catalog"){
         if(state.role!=="admin")throw Error("図鑑は管理者専用です");
         const id=String(fd.get("id")||""),product=String(fd.get("product")||"").trim();
@@ -1159,6 +1245,7 @@
       if(a==="logout"||a==="switch")await signOut();
       if(a==="reload"){location.reload();return;}
       if(a==="refresh"){await refresh();toast("更新したよ！");}
+      if(a==="shopping-send-notice")await sendShoppingPending();
       if(a==="save-notification-time")await saveNotificationTime();
       if(a==="register-push-device")await registerPushDevice();
       if(a==="remove-push-device")await removePushDevice();
