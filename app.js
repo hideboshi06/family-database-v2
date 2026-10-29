@@ -125,7 +125,7 @@
           if(state.role!=="admin"){navigate("todo");toast("図鑑の詳しい情報は管理者が確認できるよ。");return;}
           const item=state.catalog.find(x=>x.id===id);
           if(!item){toast("図鑑の品目が見つかりません",true);return;}
-          state.catalogGenre=itemGenre(item);navigate("catalog");editCatalog(id);
+          state.catalogGenre=itemGenre(item);navigate("catalog");viewCatalogCard(id);
         }
       });
       $("settings-admin").hidden=state.role!=="admin";
@@ -723,6 +723,67 @@
     }catch(e){console.warn("Photo cleanup:",e);}
     state.catalogImageUrls.delete(path);
   }
+  // A compact list is for finding items; the full, collectible-style card is for enjoying their details.
+  const catalogCardColors={
+    "ホーム":["#5386bc","#eaf4ff"],"パパ":["#536eaa","#eaf0ff"],
+    "ママ":["#b77da6","#f9eef7"],"カイ":["#6f9e70","#eef8ee"],
+    "食品":["#c08a46","#fff5e5"],"生活雑貨":["#6496a8","#eaf7fa"],
+    "炊事":["#bb8063","#fcf1e9"],"アウトドア":["#6b9075","#edf8ed"]
+  };
+  function catalogHero(x){
+    const hasPhoto=isCatalogPhotoPath(x.image);
+    return '<div class="catalog-card-hero"><span class="catalog-image-placeholder" aria-hidden="true">'+
+      (catalogGenres.find(g=>g.name===itemGenre(x))?.icon||"📦")+'</span>'+
+      (hasPhoto?'<img id="catalog-card-photo" data-id="'+esc(x.id)+'" data-image-path="'+esc(x.image)+'" alt="'+esc(x.product)+'の写真" decoding="async" style="object-position:'+imagePositionCss(x.image_position)+'" hidden>':"")+
+      '</div>';
+  }
+  async function showCatalogCardImage(path,id){
+    if(state.role!=="admin"||!isCatalogPhotoPath(path))return;
+    let entry=state.catalogImageUrls.get(path);
+    if(!entry||entry.expires<=Date.now()){
+      const result=check(await state.client.storage.from(catalogPhotoBucket).createSignedUrls([path],3600));
+      if(!result?.[0]?.signedUrl||result[0].error)return;
+      const url=new URL(result[0].signedUrl,cfg.url);
+      if(url.origin!==new URL(cfg.url).origin)return;
+      entry={url:url.href,expires:Date.now()+50*60*1000};
+      state.catalogImageUrls.set(path,entry);
+    }
+    const img=$("catalog-card-photo");
+    // Ignore an old request if another card was opened before the signed URL arrived.
+    if(!img||img.dataset.id!==id||img.dataset.imagePath!==path)return;
+    const placeholder=img.parentElement.querySelector(".catalog-image-placeholder");
+    img.onload=()=>{if(placeholder)placeholder.hidden=true;};
+    img.onerror=()=>{img.hidden=true;if(placeholder)placeholder.hidden=false;};
+    img.src=entry.url;
+    img.hidden=false;
+  }
+  function viewCatalogCard(id){
+    if(state.role!=="admin")return;
+    const x=state.catalog.find(row=>row.id===id);
+    if(!x){toast("この品目は見つからなかったよ",true);return;}
+    const genre=itemGenre(x),theme=catalogCardColors[genre]||catalogCardColors["ホーム"];
+    const genreIcon=catalogGenres.find(g=>g.name===genre)?.icon||"📦";
+    const facts=[
+      x.arrived_on?'<div class="catalog-card-fact"><span class="catalog-card-fact-key">📅 来た日</span><strong>'+esc(x.arrived_on)+'</strong></div>':"",
+      x.released_on?'<div class="catalog-card-fact"><span class="catalog-card-fact-key">📦 手放した日</span><strong>'+esc(x.released_on)+'</strong></div>':""
+    ].filter(Boolean).join("");
+    const html='<article class="catalog-detail-card" style="--catalog-accent:'+theme[0]+';--catalog-soft:'+theme[1]+'">'+
+      '<div class="catalog-card-top"><span class="catalog-card-series">FAMILY ITEM FILE</span><span class="catalog-card-category">'+genreIcon+' '+esc(genre)+'</span></div>'+
+      '<div class="catalog-card-title-label">名前・商品名</div><h3 class="catalog-card-title">'+esc(x.product)+'</h3>'+
+      catalogHero(x)+
+      '<div class="catalog-card-content">'+
+      '<div class="catalog-card-tags"><span class="catalog-card-tag">'+(x.shopping_list?"🛒 買い物リストに登録中":"📚 図鑑に登録中")+'</span>'+
+      (x.needed?'<span class="catalog-card-tag catalog-card-tag-alert">🛍️ 今、買うもの</span>':"")+'</div>'+
+      (x.note?'<section class="catalog-card-notes"><h4>📝 メモ</h4><p>'+esc(x.note)+'</p></section>':"")+
+      (facts?'<div class="catalog-card-facts">'+facts+'</div>':"")+
+      '<div class="catalog-card-footer">家族の持ち物図鑑</div>'+
+      '</div></article>';
+    modal("📚 図鑑カード",html,
+      '<button type="button" class="btn secondary" data-action="close">閉じる</button>'+
+      '<button type="button" class="btn" data-action="edit-catalog" data-id="'+esc(id)+'">編集する</button>');
+    if(isCatalogPhotoPath(x.image))
+      showCatalogCardImage(x.image,id).catch(e=>console.warn("Card photo:",e));
+  }
   function renderCatalog(){
     if(state.role!=="admin")return;
     const all=state.catalog;
@@ -737,11 +798,17 @@
     const rows=all.filter(x=>itemGenre(x)===selected.name).sort((a,b)=>String(a.product).localeCompare(String(b.product),"ja"));
     $("catalog-current-count").textContent=rows.length+"品目";
     $("catalog-items").innerHTML=rows.map(x=>{
-      const detail=[x.shopping_list?"🛒":null,x.needed?"今買うもの":null,x.arrived_on?"来た日 "+x.arrived_on:null,x.released_on?"手放した日 "+x.released_on:null,x.note||null].filter(Boolean).join(" · ");
+      const detail=String(x.note||"").trim().replace(/\s+/g," ").slice(0,90);
       const hasPhoto=isCatalogPhotoPath(x.image);
-      const picture='<div class="catalog-imagebox"><span class="catalog-image-placeholder" aria-hidden="true">📦</span>'+
-        (hasPhoto?'<img class="catalog-thumb" data-image-path="'+esc(x.image)+'" alt="'+esc(x.product)+'の写真" loading="lazy" decoding="async" style="object-position:'+imagePositionCss(x.image_position)+'" hidden>':"")+'</div>';
-      return '<div class="catalog-row">'+picture+'<div class="catalog-row-main"><div class="catalog-item-name">'+esc(x.product)+'</div>'+(detail?'<div class="catalog-item-meta">'+esc(detail)+'</div>':"")+'</div><button class="btn secondary smallbtn" type="button" data-action="edit-catalog" data-id="'+esc(x.id)+'">編集</button></div>';
+      const picture='<span class="catalog-imagebox"><span class="catalog-image-placeholder" aria-hidden="true">'+selected.icon+'</span>'+
+        (hasPhoto?'<img class="catalog-thumb" data-image-path="'+esc(x.image)+'" alt="'+esc(x.product)+'の写真" loading="lazy" decoding="async" style="object-position:'+imagePositionCss(x.image_position)+'" hidden>':"")+'</span>';
+      const tags=(x.shopping_list?'<span class="catalog-list-tag">🛒 登録中</span>':"")+
+        (x.needed?'<span class="catalog-list-tag catalog-list-alert">買うもの</span>':"");
+      return '<button type="button" class="catalog-list-row" data-action="view-catalog" data-id="'+esc(x.id)+'" aria-label="'+esc(x.product)+'の図鑑カードを開く">'+
+        picture+'<span class="catalog-row-main"><span class="catalog-item-name">'+esc(x.product)+'</span>'+
+        (detail?'<span class="catalog-item-meta">'+esc(detail)+'</span>':"")+
+        (tags?'<span class="catalog-list-tags">'+tags+'</span>':"")+'</span>'+
+        '<span class="catalog-list-chevron" aria-hidden="true">›</span></button>';
     }).join("")||'<p class="empty">まだ品目はありません。上の入力欄から登録できるよ。</p>';
     if(rows.some(x=>isCatalogPhotoPath(x.image)))
       showCatalogImages().catch(e=>console.warn("Photo display:",e));
@@ -1087,6 +1154,7 @@
       if(a==="add-shopping")await editShopping("");
       if(a==="edit-shopping")await editShopping(el.dataset.id);
        if(a==="catalog-genre"&&state.role==="admin"&&catalogGenres.some(g=>g.name===el.dataset.genre)){state.catalogGenre=el.dataset.genre;renderCatalog();}
+       if(a==="view-catalog")viewCatalogCard(el.dataset.id);
        if(a==="edit-catalog")editCatalog(el.dataset.id);
        if(a==="catalog-photo-center"){
          const field=$("catalog-photo-position"),preview=$("catalog-photo-preview");
