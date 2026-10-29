@@ -565,11 +565,23 @@ button.notes-link{width:100%;font-weight:650}
 .catalog-card-footer{text-align:center;color:#8194a4;font-size:10px;letter-spacing:.1em;margin-top:13px}
 @media(max-width:380px){.catalog-detail-card{padding:10px}.catalog-card-content{padding:10px}}
 
-/* Keep shopping checkbox and read-only card action independent on phones. */
-.shopping-item-actions{display:flex;flex:0 0 auto;align-items:center;gap:5px}
-.shopping-card-button{flex:0 0 auto;white-space:nowrap;font-size:11px!important;padding:5px 8px!important}
-@media(max-width:410px){
-  .shopping-item-actions{flex-direction:column;align-items:stretch;gap:4px}
-  .shopping-item-actions .btn{min-height:30px}
-  .todo-row .shopping-card-button{font-size:11px!important}
+/* Shopping rows open the picture card except for independent buy/edit controls. */
+.shopping-open-row{cursor:pointer;transition:background-color .15s ease}
+.shopping-open-row:hover{background:#f7fbfe}
+.shopping-open-row:focus-within{background:#f7fbfe}
+.shopping-check-toggle{display:flex;flex:0 0 30px;justify-content:center;align-items:center;
+  min-height:42px;cursor:pointer}
+.shopping-check-toggle input{margin:0}
+.todo-row .shopping-check-toggle input{width:21px;height:21px}
+.shopping-name-button{flex:1;min-width:0;min-height:42px;display:block;
+  background:transparent;border:0;border-radius:7px;padding:4px 0;text-align:left;
+  color:inherit;font:inherit;cursor:pointer}
+.shopping-name-button .item-title,.shopping-name-button .item-sub{display:block;overflow-wrap:anywhere}
+.shopping-name-button:focus-visible{outline:2px solid var(--navy);outline-offset:2px}
+.todo-name-button{display:flex;align-items:center}
+.todo-name-button .todo-copy{width:100%}
+.shopping-open-row>.btn{flex:0 0 auto}
+@media(max-width:370px){
+  .shopping-open-row{gap:5px}
+  .shopping-check-toggle{flex-basis:26px}
 }
