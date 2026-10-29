@@ -765,7 +765,10 @@
     const genreIcon=catalogGenres.find(g=>g.name===genre)?.icon||"📦";
     const facts=[
       x.arrived_on?'<div class="catalog-card-fact"><span class="catalog-card-fact-key">📅 来た日</span><strong>'+esc(x.arrived_on)+'</strong></div>':"",
-      x.released_on?'<div class="catalog-card-fact"><span class="catalog-card-fact-key">📦 手放した日</span><strong>'+esc(x.released_on)+'</strong></div>':""
+      x.released_on?'<div class="catalog-card-fact"><span class="catalog-card-fact-key">📦 手放した日</span><strong>'+esc(x.released_on)+'</strong></div>':"",
+      x.jan_code?'<div class="catalog-card-fact"><span class="catalog-card-fact-key">🔖 JANコード</span><strong>'+esc(x.jan_code)+'</strong></div>':"",
+      x.estimated_price_yen!=null&&x.estimated_price_yen!==""&&Number.isFinite(Number(x.estimated_price_yen))
+        ?'<div class="catalog-card-fact"><span class="catalog-card-fact-key">💴 価格目安</span><strong>'+esc(Number(x.estimated_price_yen).toLocaleString("ja-JP"))+'円</strong></div>':""
     ].filter(Boolean).join("");
     const html='<article class="catalog-detail-card" style="--catalog-accent:'+theme[0]+';--catalog-soft:'+theme[1]+'">'+
       '<div class="catalog-card-top"><span class="catalog-card-series">FAMILY ITEM FILE</span><span class="catalog-card-category">'+genreIcon+' '+esc(genre)+'</span></div>'+
