@@ -585,3 +585,15 @@ button.notes-link{width:100%;font-weight:650}
   .shopping-open-row{gap:5px}
   .shopping-check-toggle{flex-basis:26px}
 }
+
+/* Manual, device-local pending shopping changes; one push for the whole family. */
+.shopping-notify-panel{border-color:#c6dbed;background:#f6faff}
+.shopping-notify-panel strong{font-size:14px}
+.shopping-notify-panel .between{align-items:flex-start}
+.shopping-notify-panel .small{font-size:11px}
+.shopping-notify-summary{white-space:pre-line;overflow-wrap:anywhere;
+  font-size:13px;line-height:1.6;margin:9px 0 11px!important}
+.shopping-notify-panel .btn{min-height:44px}
+.shopping-notify-panel .tiny{margin:7px 0 0;color:var(--sub)}
+#shopping-notify-status:empty{display:none}
+#shopping-notify-status{margin:9px 0 0;line-height:1.5;overflow-wrap:anywhere}
