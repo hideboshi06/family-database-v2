@@ -738,7 +738,7 @@
     return '<div class="catalog-card-hero"><span class="catalog-image-placeholder" aria-hidden="true">'+
       (catalogGenres.find(g=>g.name===itemGenre(x))?.icon||"📦")+'</span>'+
       (hasPhoto?'<img id="catalog-card-photo" data-id="'+esc(x.id)+'" data-image-path="'+esc(x.image)+'" alt="'+esc(x.product)+'の写真" decoding="async" style="object-position:'+imagePositionCss(x.image_position)+'" hidden>':"")+
-      '<div class="catalog-card-photo-caption"><span class="catalog-card-photo-eyebrow">MY ITEM</span>'+
+      '<div class="catalog-card-photo-caption">'+
       '<h3 class="catalog-card-title" aria-label="'+esc(name)+'">'+esc(shortName)+'</h3></div></div>';
   }
   async function showCatalogCardImage(path,id){
