@@ -732,10 +732,14 @@
   };
   function catalogHero(x){
     const hasPhoto=isCatalogPhotoPath(x.image);
+    const name=String(x.product||"");
+    // Keep long product names legible on a square photo; the full text is shown below the photo.
+    const characters=Array.from(name),shortName=characters.length>30?characters.slice(0,29).join("")+"…":name;
     return '<div class="catalog-card-hero"><span class="catalog-image-placeholder" aria-hidden="true">'+
       (catalogGenres.find(g=>g.name===itemGenre(x))?.icon||"📦")+'</span>'+
       (hasPhoto?'<img id="catalog-card-photo" data-id="'+esc(x.id)+'" data-image-path="'+esc(x.image)+'" alt="'+esc(x.product)+'の写真" decoding="async" style="object-position:'+imagePositionCss(x.image_position)+'" hidden>':"")+
-      '</div>';
+      '<div class="catalog-card-photo-caption"><span class="catalog-card-photo-eyebrow">MY ITEM</span>'+
+      '<h3 class="catalog-card-title" aria-label="'+esc(name)+'">'+esc(shortName)+'</h3></div></div>';
   }
   async function showCatalogCardImage(path,id){
     if(state.role!=="admin"||!isCatalogPhotoPath(path))return;
@@ -772,9 +776,9 @@
     ].filter(Boolean).join("");
     const html='<article class="catalog-detail-card" style="--catalog-accent:'+theme[0]+';--catalog-soft:'+theme[1]+'">'+
       '<div class="catalog-card-top"><span class="catalog-card-series">FAMILY ITEM FILE</span><span class="catalog-card-category">'+genreIcon+' '+esc(genre)+'</span></div>'+
-      '<div class="catalog-card-title-label">名前・商品名</div><h3 class="catalog-card-title">'+esc(x.product)+'</h3>'+
       catalogHero(x)+
       '<div class="catalog-card-content">'+
+      (Array.from(String(x.product||"")).length>30?'<p class="catalog-card-fullname">'+esc(x.product)+'</p>':"")+
       '<div class="catalog-card-tags"><span class="catalog-card-tag">'+(x.shopping_list?"🛒 買い物リストに登録中":"📚 図鑑に登録中")+'</span>'+
       (x.needed?'<span class="catalog-card-tag catalog-card-tag-alert">🛍️ 今、買うもの</span>':"")+'</div>'+
       (x.note?'<section class="catalog-card-notes"><h4>📝 メモ</h4><p>'+esc(x.note)+'</p></section>':"")+
