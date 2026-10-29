@@ -48,6 +48,7 @@
   let catalogPhotoPrep=null;
   let catalogPhotoRevision=0;
   let catalogPreviewObjectUrl=null;
+  let catalogCardOpen=false;
   function releaseCatalogPreview(){if(catalogPreviewObjectUrl){URL.revokeObjectURL(catalogPreviewObjectUrl);catalogPreviewObjectUrl=null;}}
   const check = r => {if(r.error)throw r.error;return r.data;};
   const errorText=e=>e?.message||String(e);
@@ -58,6 +59,7 @@
   function report(e,prefix=""){console.error(prefix,e);toast(prefix+errorText(e),true);}
   function show(id){["loading","login","denied","main"].forEach(x=>$(x).hidden=(x!==id));}
   function modal(title,content,footer){
+    catalogCardOpen=false;
     catalogPhotoRevision++;
     catalogPhotoPrep=null;
     releaseCatalogPreview();
@@ -69,6 +71,7 @@
     $("modal").hidden=false;
   }
   function closeModal(){
+    catalogCardOpen=false;
     catalogPhotoRevision++;
     catalogPhotoPrep=null;
     releaseCatalogPreview();
@@ -98,6 +101,9 @@
   }
   async function init(){
     document.addEventListener("click",click);
+    document.addEventListener("keydown",e=>{
+      if(e.key==="Escape"&&catalogCardOpen&&!$("modal").hidden)closeModal();
+    });
     document.addEventListener("change",change);
     document.addEventListener("input",input);
     document.addEventListener("submit",submit);
@@ -387,9 +393,11 @@
       (t==null?"–":esc(t))+"℃"+gap+rain+"%"+umbrella;
   }
   function shoppingRow(x,brief=false){
-    return '<div class="itemrow"><label class="checkboxlabel"><input type="checkbox" data-action="shopping-needed" data-id="'+esc(x.id)+'" '+(x.needed?"checked":"")+'><span class="itemmain"><span class="item-title">'+esc(x.product)+'</span><span class="item-sub" style="display:block">'+esc(x.note||"")+'</span></span></label>'+
-      '<div class="shopping-item-actions"><button type="button" class="btn secondary smallbtn shopping-card-button" data-action="view-catalog" data-id="'+esc(x.id)+'" aria-label="'+esc(x.product)+'の図鑑カードを開く">📚 カード</button>'+
-      (brief?"":'<button type="button" class="btn secondary smallbtn" data-action="edit-shopping" data-id="'+esc(x.id)+'">編集</button>')+'</div></div>';
+    return '<div class="itemrow shopping-open-row" data-action="view-catalog" data-id="'+esc(x.id)+'">'+
+      '<label class="shopping-check-toggle" aria-label="'+esc(x.product)+'を買うものにする"><input type="checkbox" data-action="shopping-needed" data-id="'+esc(x.id)+'" aria-label="'+esc(x.product)+'を買うものにする" '+(x.needed?"checked":"")+'></label>'+
+      '<button type="button" class="shopping-name-button itemmain" data-action="view-catalog" data-id="'+esc(x.id)+'" aria-label="'+esc(x.product)+'の図鑑カードを開く">'+
+      '<span class="item-title">'+esc(x.product)+'</span><span class="item-sub">'+esc(x.note||"")+'</span></button>'+
+      (brief?"":'<button type="button" class="btn secondary smallbtn" data-action="edit-shopping" data-id="'+esc(x.id)+'">編集</button>')+'</div>';
   }
   function filledAgendaFields(row){
     return fields.filter(k=>row[k]&&String(row[k]).trim());
@@ -494,8 +502,13 @@
     const action=kind==="task"?"task-completed":kind==="shopping"?"todo-bought":"todo-cleaned";
     const badge=kind==="task"?"タスク":kind==="shopping"?"買い物":"掃除";
     const edited=kind==="task"?'<button type="button" class="btn ghost smallbtn task-edit" data-action="edit-task" data-id="'+esc(id)+'" aria-label="'+esc(label)+'を編集">編集</button>':"";
-    const card=kind==="shopping"?'<button type="button" class="btn secondary smallbtn shopping-card-button" data-action="view-catalog" data-id="'+esc(id)+'" aria-label="'+esc(label)+'の図鑑カードを開く">📚 カード</button>':"";
-    return '<div class="todo-row'+(checked?" completed":"")+'"><label class="checkboxlabel todo-check"><input type="checkbox" data-action="'+action+'" data-id="'+esc(id)+'" '+(checked?"checked":"")+'><span class="todo-copy"><span class="todo-title">'+esc(label)+'</span><span class="todo-meta"><span class="todo-origin">'+badge+'</span>'+(meta?" · "+esc(meta):"")+'</span></span></label>'+card+edited+'</div>';
+    if(kind==="shopping"){
+      return '<div class="todo-row shopping-open-row'+(checked?" completed":"")+'" data-action="view-catalog" data-id="'+esc(id)+'">'+
+        '<label class="shopping-check-toggle" aria-label="'+esc(label)+'を購入済みにする"><input type="checkbox" data-action="'+action+'" data-id="'+esc(id)+'" aria-label="'+esc(label)+'を購入済みにする" '+(checked?"checked":"")+'></label>'+
+        '<button type="button" class="shopping-name-button todo-name-button" data-action="view-catalog" data-id="'+esc(id)+'" aria-label="'+esc(label)+'の図鑑カードを開く">'+
+        '<span class="todo-copy"><span class="todo-title">'+esc(label)+'</span><span class="todo-meta"><span class="todo-origin">'+badge+'</span>'+(meta?" · "+esc(meta):"")+'</span></span></button></div>';
+    }
+    return '<div class="todo-row'+(checked?" completed":"")+'"><label class="checkboxlabel todo-check"><input type="checkbox" data-action="'+action+'" data-id="'+esc(id)+'" '+(checked?"checked":"")+'><span class="todo-copy"><span class="todo-title">'+esc(label)+'</span><span class="todo-meta"><span class="todo-origin">'+badge+'</span>'+(meta?" · "+esc(meta):"")+'</span></span></label>'+edited+'</div>';
   }
   function renderTodo(){
     const today=isoToday();
@@ -793,6 +806,7 @@
     modal("📚 図鑑カード",html,
       '<button type="button" class="btn secondary" data-action="close">閉じる</button>'+
       (state.role==="admin"?'<button type="button" class="btn" data-action="edit-catalog" data-id="'+esc(id)+'">編集する</button>':""));
+    catalogCardOpen=true;
     if(isCatalogPhotoPath(x.image))
       showCatalogCardImage(x.image,id).catch(e=>console.warn("Card photo:",e));
   }
@@ -1130,6 +1144,13 @@
     }
   }
   async function click(e){
+    // Only the detail card closes on backdrop tap; editing forms remain protected.
+    if(e.target===$("modal")&&!$("modal").hidden){
+      if(catalogCardOpen)closeModal();
+      return;
+    }
+    // Tapping a shopping checkbox/its label must never open the item card.
+    if(e.target.closest(".shopping-check-toggle"))return;
     const el=e.target.closest("[data-action],[data-tab]");if(!el)return;
     if(el.dataset.tab){navigate(el.dataset.tab);return;}
     const a=el.dataset.action;
