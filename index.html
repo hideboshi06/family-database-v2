@@ -9,7 +9,7 @@
 <link rel="manifest" href="./manifest.webmanifest">
 <meta name="description" content="Family Database v2 — 家族の予定・給食・掃除・買い物・家族ノート">
 <title>Family Database</title>
-<link rel="stylesheet" href="./styles.css?v=20261029-shopping-notify">
+<link rel="stylesheet" href="./styles.css?v=20261029-shopping-clear">
 </head>
 <body>
 <!-- Compatibility for older cached app.js versions; never shown to the user. -->
@@ -141,7 +141,10 @@
       <section class="card shopping-notify-panel" id="shopping-notify-panel" hidden aria-live="polite">
         <div class="between">
           <strong>🔔 買い物の通知待ち</strong>
-          <span class="small" id="shopping-notify-count"></span>
+          <div class="shopping-notify-head-actions">
+            <span class="small" id="shopping-notify-count"></span>
+            <button type="button" class="btn secondary smallbtn" id="shopping-notify-clear" data-action="shopping-clear-notice">クリア</button>
+          </div>
         </div>
         <p id="shopping-notify-summary" class="shopping-notify-summary"></p>
         <button type="button" class="btn full" id="shopping-notify-send" data-action="shopping-send-notice">🔔 家族全員に通知</button>
@@ -307,7 +310,7 @@
 
 <script>window.FD_CONFIG = {url:"https://besevrrmhwmkdqmoiscf.supabase.co",key:"sb_publishable_oo7Bdb8Ip-icb6Y0nqovKg_OH9Taql2"};</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="./app.js?v=20261029-shopping-notify" defer></script>
+<script src="./app.js?v=20261029-shopping-clear" defer></script>
 <script src="./notes.js?v=20261015-notes-mobile-ui" defer></script>
 </body>
 </html>
