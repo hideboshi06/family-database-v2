@@ -388,7 +388,8 @@
   }
   function shoppingRow(x,brief=false){
     return '<div class="itemrow"><label class="checkboxlabel"><input type="checkbox" data-action="shopping-needed" data-id="'+esc(x.id)+'" '+(x.needed?"checked":"")+'><span class="itemmain"><span class="item-title">'+esc(x.product)+'</span><span class="item-sub" style="display:block">'+esc(x.note||"")+'</span></span></label>'+
-      (brief?"":'<button type="button" class="btn secondary smallbtn" data-action="edit-shopping" data-id="'+esc(x.id)+'">編集</button>')+'</div>';
+      '<div class="shopping-item-actions"><button type="button" class="btn secondary smallbtn shopping-card-button" data-action="view-catalog" data-id="'+esc(x.id)+'" aria-label="'+esc(x.product)+'の図鑑カードを開く">📚 カード</button>'+
+      (brief?"":'<button type="button" class="btn secondary smallbtn" data-action="edit-shopping" data-id="'+esc(x.id)+'">編集</button>')+'</div></div>';
   }
   function filledAgendaFields(row){
     return fields.filter(k=>row[k]&&String(row[k]).trim());
@@ -493,7 +494,8 @@
     const action=kind==="task"?"task-completed":kind==="shopping"?"todo-bought":"todo-cleaned";
     const badge=kind==="task"?"タスク":kind==="shopping"?"買い物":"掃除";
     const edited=kind==="task"?'<button type="button" class="btn ghost smallbtn task-edit" data-action="edit-task" data-id="'+esc(id)+'" aria-label="'+esc(label)+'を編集">編集</button>':"";
-    return '<div class="todo-row'+(checked?" completed":"")+'"><label class="checkboxlabel todo-check"><input type="checkbox" data-action="'+action+'" data-id="'+esc(id)+'" '+(checked?"checked":"")+'><span class="todo-copy"><span class="todo-title">'+esc(label)+'</span><span class="todo-meta"><span class="todo-origin">'+badge+'</span>'+(meta?" · "+esc(meta):"")+'</span></span></label>'+edited+'</div>';
+    const card=kind==="shopping"?'<button type="button" class="btn secondary smallbtn shopping-card-button" data-action="view-catalog" data-id="'+esc(id)+'" aria-label="'+esc(label)+'の図鑑カードを開く">📚 カード</button>':"";
+    return '<div class="todo-row'+(checked?" completed":"")+'"><label class="checkboxlabel todo-check"><input type="checkbox" data-action="'+action+'" data-id="'+esc(id)+'" '+(checked?"checked":"")+'><span class="todo-copy"><span class="todo-title">'+esc(label)+'</span><span class="todo-meta"><span class="todo-origin">'+badge+'</span>'+(meta?" · "+esc(meta):"")+'</span></span></label>'+card+edited+'</div>';
   }
   function renderTodo(){
     const today=isoToday();
@@ -742,7 +744,7 @@
       '<h3 class="catalog-card-title" aria-label="'+esc(name)+'">'+esc(shortName)+'</h3></div></div>';
   }
   async function showCatalogCardImage(path,id){
-    if(state.role!=="admin"||!isCatalogPhotoPath(path))return;
+    if(!state.user||!isCatalogPhotoPath(path))return;
     let entry=state.catalogImageUrls.get(path);
     if(!entry||entry.expires<=Date.now()){
       const result=check(await state.client.storage.from(catalogPhotoBucket).createSignedUrls([path],3600));
@@ -762,8 +764,11 @@
     img.hidden=false;
   }
   function viewCatalogCard(id){
-    if(state.role!=="admin")return;
-    const x=state.catalog.find(row=>row.id===id);
+    if(!state.user)return;
+    // Non-admin family members see only items already visible in their shopping list.
+    const x=state.role==="admin"
+      ?state.catalog.find(row=>row.id===id)
+      :state.shopping.find(row=>row.id===id&&row.shopping_list);
     if(!x){toast("この品目は見つからなかったよ",true);return;}
     const genre=itemGenre(x),theme=catalogCardColors[genre]||catalogCardColors["ホーム"];
     const genreIcon=catalogGenres.find(g=>g.name===genre)?.icon||"📦";
@@ -787,7 +792,7 @@
       '</div></article>';
     modal("📚 図鑑カード",html,
       '<button type="button" class="btn secondary" data-action="close">閉じる</button>'+
-      '<button type="button" class="btn" data-action="edit-catalog" data-id="'+esc(id)+'">編集する</button>');
+      (state.role==="admin"?'<button type="button" class="btn" data-action="edit-catalog" data-id="'+esc(id)+'">編集する</button>':""));
     if(isCatalogPhotoPath(x.image))
       showCatalogCardImage(x.image,id).catch(e=>console.warn("Card photo:",e));
   }
