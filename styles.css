@@ -541,10 +541,8 @@ button.notes-link{width:100%;font-weight:650}
   padding:42px clamp(12px,3vw,18px) clamp(13px,3vw,19px);
   background:linear-gradient(to bottom,transparent 0%,rgba(23,38,57,.68) 53%,rgba(23,38,57,.88) 100%);
   pointer-events:none}
-.catalog-card-photo-eyebrow{display:inline-block;padding:3px 9px;border-radius:20px;
-  background:var(--catalog-accent);border:1px solid #ffffff80;color:#fff;
-  font:800 10px/1.4 -apple-system,BlinkMacSystemFont,"Hiragino Sans",sans-serif;
-  letter-spacing:.11em;text-shadow:0 1px 2px #0003}
+/* Hide legacy MY ITEM markup if an older cached script is still open. */
+.catalog-card-photo-eyebrow{display:none!important}
 .catalog-card-title{margin:0!important;max-width:100%;
   color:#fff!important;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;
   font-size:clamp(19px,5vw,27px)!important;font-weight:850!important;line-height:1.32!important;
@@ -566,3 +564,12 @@ button.notes-link{width:100%;font-weight:650}
 .catalog-card-fact strong{font-size:13px;font-weight:750;color:var(--ink)}
 .catalog-card-footer{text-align:center;color:#8194a4;font-size:10px;letter-spacing:.1em;margin-top:13px}
 @media(max-width:380px){.catalog-detail-card{padding:10px}.catalog-card-content{padding:10px}}
+
+/* Keep shopping checkbox and read-only card action independent on phones. */
+.shopping-item-actions{display:flex;flex:0 0 auto;align-items:center;gap:5px}
+.shopping-card-button{flex:0 0 auto;white-space:nowrap;font-size:11px!important;padding:5px 8px!important}
+@media(max-width:410px){
+  .shopping-item-actions{flex-direction:column;align-items:stretch;gap:4px}
+  .shopping-item-actions .btn{min-height:30px}
+  .todo-row .shopping-card-button{font-size:11px!important}
+}
