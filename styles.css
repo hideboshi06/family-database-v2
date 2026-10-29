@@ -589,7 +589,9 @@ button.notes-link{width:100%;font-weight:650}
 /* Manual, device-local pending shopping changes; one push for the whole family. */
 .shopping-notify-panel{border-color:#c6dbed;background:#f6faff}
 .shopping-notify-panel strong{font-size:14px}
-.shopping-notify-panel .between{align-items:flex-start}
+.shopping-notify-panel .between{align-items:center;flex-wrap:wrap}
+.shopping-notify-head-actions{display:flex;align-items:center;justify-content:flex-end;gap:7px;flex-wrap:wrap}
+.shopping-notify-head-actions .btn.smallbtn{min-height:32px;padding:5px 10px}
 .shopping-notify-panel .small{font-size:11px}
 .shopping-notify-summary{white-space:pre-line;overflow-wrap:anywhere;
   font-size:13px;line-height:1.6;margin:9px 0 11px!important}
