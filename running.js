@@ -106,18 +106,19 @@
      field("run-memo","練習メモ",'<textarea name="memo" maxlength="3000" placeholder="練習の目的・感想">'+esc(a.memo||"")+'</textarea>')+
      '<div class="run-actions"><button type="submit" class="btn">保存する</button>'+smallbtn("キャンセル",'data-run-edit="0"')+'</div><p id="run-edit-status" class="status" role="status"></p></form>';
  }
- function detailMeta(a){
-   let shoe=state.shoes.find(s=>s.id===a.shoe_id)?.shoe_name||"未設定";
-   return '<div class="run-datarow"><span>練習種別</span><strong>'+esc(label(a.training_type))+'</strong></div>'+
-          '<div class="run-datarow"><span>シューズ</span><strong>'+esc(shoe)+'</strong></div>'+
-          '<div class="run-datarow"><span>きつさ（RPE）</span><strong>'+esc(a.rpe==null?"未入力":a.rpe+"/10")+'</strong></div>'+
-          '<div class="run-datarow"><span>疲労感</span><strong>'+esc(a.fatigue==null?"未入力":a.fatigue+"/5")+'</strong></div>'+
-          (a.pain_note?'<div class="run-textnote"><small>違和感・痛み</small><p>'+esc(a.pain_note)+'</p></div>':"")+
-          (a.memo?'<div class="run-textnote"><small>メモ</small><p>'+esc(a.memo)+'</p></div>':"");
- }
 
- // Session-RPE load: subjective exertion 1–10 times moving duration in minutes.
- // This is not Garmin's EPOC exercise load, nor an objective fatigue diagnosis.
+ function detailMeta(a){
+   const shoe=state.shoes.find(s=>s.id===a.shoe_id)?.shoe_name||null;
+   const lines=[];
+   const row=(k,v)=>'<div class="run-datarow"><span>'+esc(k)+'</span><strong>'+esc(v)+'</strong></div>';
+   if(a.training_type)lines.push(row("練習種別",label(a.training_type)));
+   if(shoe)lines.push(row("シューズ",shoe));
+   if(a.rpe!=null)lines.push(row("きつさ（RPE）",a.rpe+"/10"));
+   if(a.fatigue!=null)lines.push(row("疲労感",a.fatigue+"/5"));
+   if(a.pain_note)lines.push('<div class="run-textnote"><small>違和感・痛み</small><p>'+esc(a.pain_note)+'</p></div>');
+   if(a.memo)lines.push('<div class="run-textnote"><small>メモ</small><p>'+esc(a.memo)+'</p></div>');
+   return lines.length?lines.join(""):'<div class="small">未記入でOK。FITの記録だけで使えるよ。</div>';
+ }
 
  // Optional, fully automatic comparison of runs at broadly similar distance
  // and moving pace. A heart-rate difference is descriptive, not a diagnosis
