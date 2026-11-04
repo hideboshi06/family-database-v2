@@ -145,15 +145,29 @@
      finite(activity.moving_time_seconds)?n(activity.moving_time_seconds):0);
    const totalD=Math.max(n(last.distance_m),finite(activity.distance_m)?n(activity.distance_m):0);
    const heart=p=>p.avg_heart_rate_bpm==null?NaN:n(p.avg_heart_rate_bpm);
-   const anchors=[{t:0,d:0,h:heart(valid[0])}];
+   const pace=p=>finite(p.avg_pace_sec_per_km)&&n(p.avg_pace_sec_per_km)>0?n(p.avg_pace_sec_per_km):NaN;
+   const anchors=[{t:0,d:0,h:heart(valid[0]),p:pace(valid[0])}];
    for(const p of valid){
      const t=n(p.elapsed_seconds),d=n(p.distance_m);
      if(t<=anchors[anchors.length-1].t)continue;
-     anchors.push({t,d:Math.max(anchors[anchors.length-1].d,d),h:heart(p)});
+     anchors.push({t,d:Math.max(anchors[anchors.length-1].d,d),h:heart(p),p:pace(p)});
    }
    if(totalT>anchors[anchors.length-1].t){
-     anchors.push({t:totalT,d:Math.max(totalD,anchors[anchors.length-1].d),h:anchors[anchors.length-1].h});
+     anchors.push({t:totalT,d:Math.max(totalD,anchors[anchors.length-1].d),h:anchors[anchors.length-1].h,p:anchors[anchors.length-1].p});
    }
+   // Reconstruct active (moving) time from the stored bucket pace and distance.
+   // Calendar elapsed time still controls the time-axis x positions; pauses
+   // must not inflate average running pace in either graph.
+   const movingEstimate=(a,b)=>{
+     const delta=Math.max(0,b.d-a.d);
+     const secPerKm=Number.isFinite(b.p)&&b.p>0?b.p:(Number.isFinite(a.p)&&a.p>0?a.p:NaN);
+     return delta>0&&Number.isFinite(secPerKm)?delta*secPerKm/1000:(b.t-a.t);
+   };
+   let inferredMoving=0;
+   for(let i=1;i<anchors.length;i++)inferredMoving+=movingEstimate(anchors[i-1],anchors[i]);
+   const officialMoving=finite(activity.moving_time_seconds)?n(activity.moving_time_seconds):NaN;
+   const factor=Number.isFinite(officialMoving)&&officialMoving>0&&inferredMoving>0
+     ?officialMoving/inferredMoving:1;
    const groups=new Map(),total=mode==="time"?totalT:totalD;
    for(let i=1;i<anchors.length;i++){
      const a=anchors[i-1],b=anchors[i],startX=mode==="time"?a.t:a.d,endX=mode==="time"?b.t:b.d;
@@ -166,8 +180,9 @@
        const dt=Math.max(0,(b.t-a.t)*(f1-f0));
        const dd=Math.max(0,(b.d-a.d)*(f1-f0));
        let g=groups.get(index);
-       if(!g){g={index,dt:0,dd:0,heartTotal:0,heartTime:0};groups.set(index,g);}
+       if(!g){g={index,dt:0,movingDt:0,dd:0,heartTotal:0,heartTime:0};groups.set(index,g);}
        g.dt+=dt;g.dd+=dd;
+       g.movingDt+=movingEstimate(a,b)*(f1-f0)*factor;
        if(Number.isFinite(a.h)&&Number.isFinite(b.h)&&dt>0){
          const ha=a.h+(b.h-a.h)*f0,hb=a.h+(b.h-a.h)*f1;
          g.heartTotal+=(ha+hb)/2*dt;g.heartTime+=dt;
@@ -181,7 +196,7 @@
      return {
        x:(start+end)/2,start,end,
        hr:g.heartTime>0?g.heartTotal/g.heartTime:NaN,
-       pace:g.dd>0?g.dt*1000/g.dd:NaN,
+       pace:g.dd>0?g.movingDt*1000/g.dd:NaN,
        label:mode==="time"?fmtTime(start)+"〜"+fmtTime(end):
          (start/1000).toFixed(0)+"〜"+(end/1000).toFixed(end%1000?2:0)+" km"
      };
