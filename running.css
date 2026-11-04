@@ -86,3 +86,22 @@
 .running-page .run-effort-item strong{display:block;font-size:19px;line-height:1.4;margin-top:3px;color:var(--ink);font-weight:800;font-variant-numeric:tabular-nums}
 .running-page .run-effort-meta{font-size:11px;color:var(--sub);margin-top:9px}
 .running-page .run-chart-hint[hidden]{display:none}
+
+
+/* Heart-rate zones are an automatic intensity estimate, not Garmin EPOC load. */
+.running-page .run-zone-main{font-size:12px;color:var(--navy);font-weight:800;white-space:nowrap}
+.running-page .run-zone-bar{height:17px;border-radius:10px;display:flex;overflow:hidden;background:#edf1f4;margin:10px 0}
+.running-page .run-zone-color{display:block;height:100%;flex:0 0 auto}
+.running-page .run-zone-color-0{background:#c6cdd4}
+.running-page .run-zone-color-1{background:#aeb7c2}
+.running-page .run-zone-color-2{background:#3b82ce}
+.running-page .run-zone-color-3{background:#16a15a}
+.running-page .run-zone-color-4{background:#e27f25}
+.running-page .run-zone-color-5{background:#c5444c}
+.running-page .run-zone-labels{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:2px}
+.running-page .run-zone-labels span{display:flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap;font-size:10px;color:var(--sub);font-variant-numeric:tabular-nums}
+.running-page .run-zone-labels strong{color:var(--ink);font-weight:750}
+.running-page .run-zone-key{width:7px;height:7px;border-radius:2px;flex:0 0 7px}
+.running-page .run-zone-caption{color:var(--sub);font-size:10px;margin-top:10px}
+.running-page .run-zone-comparison{border-top:1px solid #edf2f6;margin-top:9px;padding-top:9px;color:#53718b;font-size:11px}
+@media(max-width:380px){.running-page .run-zone-main{font-size:11px}.running-page .run-zone-labels span{font-size:9px;gap:3px}}

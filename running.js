@@ -67,7 +67,7 @@
    state.loading=true;state.error="";render();
    try{
      const [a,s,r]=await Promise.all([
-       state.client.from("running_activities").select("id,garmin_activity_id,started_at,title,activity_type,distance_m,moving_time_seconds,elapsed_time_seconds,avg_heart_rate_bpm,max_heart_rate_bpm,avg_cadence_spm,training_type,shoe_id,race_id,rpe,fatigue,pain_note,memo").order("started_at",{ascending:false}).limit(1000),
+       state.client.from("running_activities").select("id,garmin_activity_id,started_at,title,activity_type,distance_m,moving_time_seconds,elapsed_time_seconds,avg_heart_rate_bpm,max_heart_rate_bpm,avg_cadence_spm,training_type,shoe_id,race_id,rpe,fatigue,pain_note,memo,raw_summary").order("started_at",{ascending:false}).limit(1000),
        state.client.from("running_shoes").select("id,shoe_name,baseline_distance_m,retired_on").order("shoe_name"),
        state.client.from("running_races").select("id,race_name,race_date,race_month,distance_m,registration_status,target_time_seconds").order("race_date",{ascending:true,nullsFirst:false})
      ]);
@@ -81,7 +81,7 @@
    try{
      const [l,p]=await Promise.all([
        state.client.from("running_laps").select("lap_index,distance_m,duration_seconds,avg_heart_rate_bpm,max_heart_rate_bpm,avg_pace_sec_per_km,segment_type").eq("activity_id",id).order("lap_index"),
-       state.client.from("running_activity_graph_points").select("point_index,elapsed_seconds,distance_m,avg_heart_rate_bpm,avg_pace_sec_per_km").eq("activity_id",id).order("point_index")
+       state.client.from("running_activity_graph_points").select("point_index,elapsed_seconds,distance_m,avg_heart_rate_bpm,avg_pace_sec_per_km,bucket_seconds").eq("activity_id",id).order("point_index")
      ]);
      if(state.selected?.id!==id)return;
      state.laps=checked(l);state.points=checked(p);renderDetail();
@@ -138,24 +138,49 @@
    const baseline=other.reduce((sum,b)=>sum+n(b.avg_heart_rate_bpm),0)/other.length;
    return {count:other.length,baseline,diff:hr-baseline};
  }
+
+ // Garmin running HR zones from the supplied Garmin Connect screenshot.
+ // Ranges: Z1 93–110, Z2 111–129, Z3 130–147, Z4 148–166, Z5 >=167.
+ // Prefer per-record FIT estimates (timer-paused sections excluded). Fall back
+ // to coarse bucket averages only for older imports without FIT zone metadata.
+ function heartZoneOf(hr){
+   if(hr<93)return 0;
+   if(hr<111)return 1;
+   if(hr<130)return 2;
+   if(hr<148)return 3;
+   if(hr<167)return 4;
+   return 5;
+ }
+ function heartZoneData(a){
+   const raw=a.raw_summary&&a.raw_summary.hr_zones_seconds;
+   if(Array.isArray(raw)&&raw.length===6&&raw.every(x=>Number.isFinite(Number(x))&&Number(x)>=0)){
+     return {seconds:raw.map(Number),source:"fit"};
+   }
+   const seconds=[0,0,0,0,0,0];
+   for(const p of state.points){
+     if(!finite(p.avg_heart_rate_bpm))continue;
+     const sec=finite(p.bucket_seconds)&&n(p.bucket_seconds)>0?n(p.bucket_seconds):0;
+     if(sec>0)seconds[heartZoneOf(n(p.avg_heart_rate_bpm))]+=sec;
+   }
+   return {seconds,source:"coarse"};
+ }
  function effortCard(a){
+   const {seconds,source}=heartZoneData(a);
+   const total=seconds.reduce((s,x)=>s+x,0);
+   if(total<=0)return "";
+   const zoneNames=["ゾーン外","リラックス","イージー","中強度","ハード","高強度"];
+   const main=[1,2,3,4,5].reduce((best,i)=>seconds[i]>seconds[best]?i:best,1);
+   const mainLabel="Z"+main+"中心・"+zoneNames[main];
+   const percent=i=>Math.round(seconds[i]/total*100);
    const comparison=automaticComparison(a);
-   if(!comparison){
-     return card(titlebar("ランニング比較")+
-       '<div class="run-effort-meta">同じくらいの距離・ペースの記録が増えると、心拍の比較ができるよ。入力は不要。</div>');
-   }
-   if(comparison.count<2){
-     return card(titlebar("ランニング比較")+
-       '<div class="run-effort-meta">近い距離・ペースのランがあと'+(2-comparison.count)+'件増えると、平均心拍を比べられるよ。</div>');
-   }
-   const d=Math.round(comparison.diff);
-   const delta=d>0?"+"+d:d.toString();
-   const descriptor=Math.abs(d)<=3?"ほぼ同じ":d>0?"やや高め":"やや低め";
-   return card(titlebar("ランニング比較")+
-     '<div class="run-effort-metrics">'+
-       '<div class="run-effort-item"><span>近い条件の平均心拍</span><strong>'+Math.round(comparison.baseline)+' bpm</strong></div>'+
-       '<div class="run-effort-item"><span>今回との差</span><strong>'+esc(delta)+' bpm</strong></div>'+
-     '</div><div class="run-effort-meta">'+esc(comparison.count)+'件の近い距離・ペースと比較：'+esc(descriptor)+'。心拍差だけで疲労や負荷は断定できないよ。</div>');
+   const historical=comparison&&comparison.count>=2
+     ?'<div class="run-zone-comparison">近い距離・ペースの'+comparison.count+'回と比較：平均心拍 '+(Math.round(comparison.diff)>0?"+":"")+Math.round(comparison.diff)+' bpm</div>'
+     :"";
+   return card(titlebar("心拍ゾーン",'<span class="run-zone-main">'+esc(mainLabel)+'</span>')+
+     '<div class="run-zone-bar" role="img" aria-label="ゾーン別の心拍滞在割合">'+
+     seconds.map((sec,i)=>sec>0?'<span class="run-zone-color run-zone-color-'+i+'" style="width:'+(sec/total*100).toFixed(3)+'%"></span>':"").join("")+'</div>'+
+     '<div class="run-zone-labels">'+[1,2,3,4,5].map(i=>'<span><i class="run-zone-key run-zone-color-'+i+'"></i>Z'+i+' <strong>'+percent(i)+'%</strong></span>').join("")+'</div>'+
+     '<div class="run-zone-caption">FIT心拍から'+(source==="fit"?"記録点ごとに":"30秒平均から")+'自動推定。Garminの表示とは差が出ることがあるよ。</div>'+historical);
  }
 
  function renderDetail(){
