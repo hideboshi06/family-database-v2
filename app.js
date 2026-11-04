@@ -91,6 +91,7 @@
     if(page==="todo")renderTodo();
     if(page==="catalog")renderCatalog();
     if(page==="notes")window.FamilyNotes?.load();
+    if(page==="running")window.FamilyRunning?.load();
     if(page==="settings"){
       refreshPushDeviceStatus().catch(e=>report(e,"受信端末: "));
       loadMembers().catch(e=>report(e,"メンバー読込: "));
@@ -137,11 +138,13 @@
           state.catalogGenre=itemGenre(item);navigate("catalog");viewCatalogCard(id);
         }
       });
+      window.FamilyRunning?.init({client:state.client});
       $("settings-admin").hidden=state.role!=="admin";
       $("page-catalog").hidden=state.role!=="admin";
       $("catalog-tab").hidden=state.role!=="admin";
       $("notification-admin-controls").hidden=state.role!=="admin";
-      show("main");navigate(new URLSearchParams(location.search).get("from")==="shopping"?"todo":"dashboard");
+      const startFrom=new URLSearchParams(location.search).get("from");
+      show("main");navigate(startFrom==="shopping"?"todo":startFrom==="running"?"running":"dashboard");
       if("serviceWorker" in navigator)
         navigator.serviceWorker.register("./sw.js",{scope:"./"}).catch(e=>console.warn("Service Worker:",e));
       if(location.search.includes("code="))history.replaceState(null,"",location.pathname);

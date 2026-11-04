@@ -10,6 +10,7 @@
 <meta name="description" content="Family Database v2 — 家族の予定・給食・掃除・買い物・家族ノート">
 <title>Family Database</title>
 <link rel="stylesheet" href="./styles.css?v=20261029-shopping-clear">
+<link rel="stylesheet" href="./running.css?v=20261104-running">
 </head>
 <body>
 <!-- Compatibility for older cached app.js versions; never shown to the user. -->
@@ -232,6 +233,11 @@
       </section>
     </div>
 
+    <div id="page-running" class="page running-page">
+      <h1 class="section-page-title">🏃 ランニング</h1>
+      <div id="running-root" aria-live="polite"><section class="card">記録を読み込み中…</section></div>
+    </div>
+
     <div id="page-settings" class="page">
       <section class="card">
         <div class="between"><h2>設定</h2><button type="button" class="btn secondary smallbtn" data-action="logout">ログアウト</button></div>
@@ -286,6 +292,7 @@
     <nav class="tabbar" aria-label="メインメニュー">
       <button type="button" data-tab="dashboard" class="active"><span class="ico">📅</span>スケジュール</button>
       <button type="button" data-tab="todo"><span class="ico">☑️</span>やること</button>
+      <button type="button" data-tab="running"><span class="ico">🏃</span>ラン</button>
       <button type="button" data-tab="catalog" id="catalog-tab" hidden><span class="ico">📚</span>図鑑</button>
       <button type="button" data-tab="notes"><span class="ico">📖</span>ノート</button>
        <button type="button" data-tab="settings"><span class="ico">⚙️</span>設定</button>
@@ -310,7 +317,8 @@
 
 <script>window.FD_CONFIG = {url:"https://besevrrmhwmkdqmoiscf.supabase.co",key:"sb_publishable_oo7Bdb8Ip-icb6Y0nqovKg_OH9Taql2"};</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="./app.js?v=20261029-shopping-clear" defer></script>
+<script src="./running.js?v=20261104-running" defer></script>
+<script src="./app.js?v=20261104-running" defer></script>
 <script src="./notes.js?v=20261015-notes-mobile-ui" defer></script>
 </body>
 </html>
