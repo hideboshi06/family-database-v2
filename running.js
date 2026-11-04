@@ -122,10 +122,10 @@
    card('<div class="run-hero-label">Garmin FIT · '+esc(fdate(a.started_at))+'</div><h2 class="run-title">'+esc(a.title||"ランニング")+'</h2>'+metricCard(a)+
    '<div class="run-details-strip"><span>最大心拍 '+esc(finite(a.max_heart_rate_bpm)?a.max_heart_rate_bpm+" bpm":"—")+'</span><span>Garminラップ '+l+'件</span><span>グラフ '+g+'点</span></div>')+
    card(titlebar("ペース・心拍の推移")+
-     '<div class="run-axis" role="tablist" aria-label="横軸の切替">'+[["time","時間"],["distance","距離"],["lap","ラップ（距離）"]].map(([k,v])=>'<button type="button" data-run-axis="'+k+'" aria-selected="'+(state.axis===k)+'" class="'+(state.axis===k?"active":"")+'">'+v+'</button>').join("")+'</div>'+
+     '<div class="run-axis" role="tablist" aria-label="横軸の切替">'+[["time","時間"],["distance","距離"],["lap","ラップ"]].map(([k,v])=>'<button type="button" data-run-axis="'+k+'" aria-selected="'+(state.axis===k)+'" class="'+(state.axis===k?"active":"")+'">'+v+'</button>').join("")+'</div>'+
      '<div class="run-legend"><span><i class="run-swatch run-hr"></i>心拍：点＋線（左軸）</span><span><i class="run-swatch run-pace"></i>ペース：縦棒（右軸）</span></div>'+
      '<div class="run-plot-wrap" id="run-plot"></div><p class="run-chart-hint" id="run-chart-info"></p>'+
-     '<div class="run-chart-note">時間は10分単位、距離は1km単位の区間平均。ラップはGarmin本来の細かい区間を表示。速いペースほど棒が高くなるよ。</div>')+
+     '<div class="run-chart-note">時間は10分ごと、距離は1kmごとの平均。ラップは1区間1本（棒幅は同じ）で距離と練習種別を表示。速いペースほど棒が高くなるよ。</div>')+
    card(titlebar("Garminラップ")+(l?'<div class="run-table-wrap"><table class="run-table"><thead><tr><th>Lap</th><th>区間</th><th>距離</th><th>ペース</th><th>平均心拍</th></tr></thead><tbody>'+
      state.laps.map(x=>'<tr><td>'+esc(x.lap_index)+'</td><td>'+esc(segments[x.segment_type]||"—")+'</td><td>'+esc(fmtDist(x.distance_m))+'</td><td>'+esc(fmtPaceSec(x.avg_pace_sec_per_km))+'</td><td>'+esc(finite(x.avg_heart_rate_bpm)?x.avg_heart_rate_bpm+" bpm":"—")+'</td></tr>').join("")+'</tbody></table></div>':empty("FITにラップ情報がないよ。")))+
    card(titlebar("練習メモ",!state.editing?smallbtn("編集する",'data-run-edit="1"'):"")+(state.editing?form(a):detailMeta(a)));
@@ -194,10 +194,12 @@
    const mode=state.axis, laps=state.laps, raw=state.points;
    let samples;
    if(mode==="lap"){
-     let d=0; samples=laps.map(l=>{const distance=Math.max(0,n(l.distance_m)||0);const point={x:d+distance/2,hr:n(l.avg_heart_rate_bpm),pace:n(l.avg_pace_sec_per_km),label:"Lap "+l.lap_index,lap:l};d+=distance;return point;});
+     samples=laps.map((l,i)=>({x:i+0.5,hr:n(l.avg_heart_rate_bpm),pace:n(l.avg_pace_sec_per_km),label:"Lap "+l.lap_index,lap:l}));
    }else samples=coarseRunningPoints(raw,state.selected,mode);
    if(!samples.length){target.innerHTML=empty("この記録のグラフデータはまだないよ。");info.textContent="";return;}
-   const width=mode==="lap"?Math.max(520,samples.length*65+125):Math.max(mode==="time"?480:530,samples.length*(mode==="time"?105:80)+115),height=292,left=63,right=width-67,top=24,bottom=228;
+   // Equal-width lap columns keep 200m recoveries as readable as 400m efforts.
+   // Many short interval laps remain scrollable rather than being compressed.
+   const width=mode==="lap"?Math.max(480,samples.length*86+115):Math.max(mode==="time"?480:530,samples.length*(mode==="time"?105:80)+115),height=mode==="lap"?320:292,left=63,right=width-67,top=24,bottom=228;
    const valuesH=samples.map(x=>x.hr).filter(Number.isFinite),valuesP=samples.map(x=>x.pace).filter(x=>Number.isFinite(x)&&x>0);
    if(!valuesH.length&&!valuesP.length){target.innerHTML=empty("表示可能な心拍・ペースデータがないよ。");info.textContent="";return;}
    let h0=Math.max(40,Math.floor(((valuesH.length?Math.min(...valuesH):100)-12)/10)*10),h1=Math.min(230,Math.ceil(((valuesH.length?Math.max(...valuesH):160)+12)/10)*10);
@@ -205,7 +207,7 @@
    let p0=valuesP.length?Math.max(60,Math.floor(Math.min(...valuesP)*0.90/30)*30):180;
    let p1=valuesP.length?Math.ceil(Math.max(...valuesP)*1.1/30)*30:600;
    if(p1-p0<90){p0=Math.max(60,p0-45);p1=p0+135;}
-   let xMin=0, xMax=mode==="lap"?sum(laps,l=>l.distance_m):Math.max(...samples.map(s=>s.end));
+   let xMin=0, xMax=mode==="lap"?samples.length:Math.max(...samples.map(s=>s.end));
    if(xMax<=xMin)xMax=xMin+1;
    const X=v=>left+(right-left)*(v-xMin)/(xMax-xMin);
    const Yh=v=>bottom-(v-h0)/(h1-h0)*(bottom-top);
@@ -220,14 +222,18 @@
    }
    svg+='<line x1="'+left+'" x2="'+right+'" y1="'+bottom+'" y2="'+bottom+'" stroke="#a8bbc9"/>';
    if(mode==="lap"){
-     let d=0;
-     laps.forEach((l,i)=>{const newD=d+(Math.max(0,n(l.distance_m)||0));const start=X(d),end=X(newD);const colors={work:"#eaf3fb",recovery:"#fff3e9",warmup:"#f1f5f8",cooldown:"#f1f5f8",steady:"#f7f9fb",unknown:i%2===0?"#f7f9fb":"#fff"};svg+='<rect x="'+start+'" y="'+top+'" width="'+Math.max(0,end-start)+'" height="'+(bottom-top)+'" fill="'+(colors[l.segment_type]||"#f7f9fb")+'"/>';svg+='<line x1="'+end+'" x2="'+end+'" y1="'+top+'" y2="'+bottom+'" stroke="#cfdee9" stroke-dasharray="2 4"/>';d=newD;});
+     laps.forEach((l,i)=>{
+       const start=X(i),end=X(i+1);
+       const colors={work:"#e8f1fa",recovery:"#fff3e9",warmup:"#f1f5f8",cooldown:"#f1f5f8",steady:"#f7f9fb",unknown:i%2===0?"#f7f9fb":"#fff"};
+       svg+='<rect x="'+at(start)+'" y="'+top+'" width="'+at(end-start)+'" height="'+(bottom-top)+'" fill="'+(colors[l.segment_type]||"#f7f9fb")+'"/>';
+       svg+='<line x1="'+at(end)+'" x2="'+at(end)+'" y1="'+top+'" y2="'+bottom+'" stroke="#cfdee9" stroke-dasharray="2 4"/>';
+     });
    }
    for(let i=0;i<samples.length;i++){
      const s=samples[i];if(!Number.isFinite(s.pace)||s.pace<=0)continue;
      const px=X(s.x),prev=i?samples[i-1].x:xMin,next=i+1<samples.length?samples[i+1].x:xMax;
      const available=Math.min((px-X(prev))*1.2,(X(next)-px)*1.2);
-     const barW=mode==="lap"?Math.min(85,Math.max(10,available)):Math.max(20,Math.min(54,Math.max(20,available*.8)));
+     const barW=mode==="lap"?Math.min(54,(right-left)/Math.max(1,samples.length)*0.62):Math.max(20,Math.min(54,Math.max(20,available*.8)));
      const y=Math.max(top,Math.min(bottom,Yp(s.pace)));
      svg+='<rect x="'+at(px-barW/2)+'" y="'+at(y)+'" width="'+at(barW)+'" height="'+at(bottom-y)+'" rx="2" fill="#d9814b" fill-opacity=".58" stroke="#c7743e" stroke-opacity=".65" data-run-point="'+i+'"/>';
    }
@@ -235,8 +241,15 @@
    if(hrPts.length>1)svg+='<polyline points="'+hrPts.map(s=>at(X(s.x))+","+at(Yh(s.hr))).join(" ")+'" fill="none" stroke="#2d6595" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>';
    for(const s of hrPts){const ix=samples.indexOf(s);svg+='<circle cx="'+at(X(s.x))+'" cy="'+at(Yh(s.hr))+'" r="3.8" stroke="#fff" stroke-width="1.3" fill="#2d6595" data-run-point="'+ix+'"/>';}
    if(mode==="lap"){
-     samples.forEach((s,i)=>{const x=X(s.x);svg+='<text x="'+at(x)+'" y="247" text-anchor="middle" fill="#6b7e8f" font-size="11">L'+(i+1)+'</text><text x="'+at(x)+'" y="262" text-anchor="middle" fill="#8797a6" font-size="10">'+Math.round(n(laps[i].distance_m)||0)+'m</text>';});
-     info.textContent=laps.length===1?"このFITのGarminラップは1件だよ。":"ラップ区間をタップすると距離・心拍・ペースを確認できるよ。";
+     samples.forEach((s,i)=>{
+       const x=X(s.x),l=laps[i],part=segments[l.segment_type]||"未分類";
+       svg+='<text x="'+at(x)+'" y="247" text-anchor="middle" fill="#516c83" font-size="11" font-weight="700">L'+esc(l.lap_index)+'</text>';
+       svg+='<text x="'+at(x)+'" y="265" text-anchor="middle" fill="#6b7e8f" font-size="10">'+(finite(l.distance_m)?Math.round(n(l.distance_m))+"m":"—")+'</text>';
+       svg+='<text x="'+at(x)+'" y="281" text-anchor="middle" fill="#7d8d9e" font-size="10">'+esc(part)+'</text>';
+       // Full-column tap target so even a very short pace bar can be selected.
+       svg+='<rect x="'+at(X(i))+'" y="'+top+'" width="'+at(X(i+1)-X(i))+'" height="'+(bottom-top)+'" fill="transparent" data-run-point="'+i+'" aria-label="Lap '+esc(l.lap_index)+'"/>';
+     });
+     info.textContent=laps.length===1?"このFITのGarminラップは1件だよ。":"ラップをタップすると距離・ペース・平均／最大心拍を確認できるよ。";
    }else{
      const increment=mode==="time"?600:1000;
      for(let value=0;value<=xMax+0.000001;value+=increment){
@@ -245,7 +258,7 @@
      }
      info.textContent=(mode==="time"?"10分ごと":"1kmごと")+"の平均。点や棒をタップすると区間の数値がわかるよ。";
    }
-   svg+='<text x="'+at((left+right)/2)+'" y="282" text-anchor="middle" fill="#6b7e8f">'+(mode==="time"?"経過時間":mode==="distance"?"累積距離 (km)":"Garminラップ (区間距離に比例)")+'</text></svg>';
+   svg+='<text x="'+at((left+right)/2)+'" y="'+(mode==="lap"?311:282)+'" text-anchor="middle" fill="#6b7e8f">'+(mode==="time"?"経過時間":mode==="distance"?"累積距離 (km)":"Garminラップ（1ラップ＝1本・等間隔）")+'</text></svg>';
    target.innerHTML=svg;
    target._pointSamples=samples;
  }
@@ -276,7 +289,7 @@
        if(b.dataset.runEdit!==undefined){state.editing=b.dataset.runEdit==="1";renderDetail();return;}
        if(b.dataset.runPoint!==undefined){
          const points=$("#run-plot")?._pointSamples||[],p=points[Number(b.dataset.runPoint)],out=$("#run-chart-info");if(!p||!out)return;
-         out.textContent=state.axis==="lap"?(p.label+"・"+fmtDist(p.lap.distance_m)+"・"+fmtPaceSec(p.pace)+"・心拍 "+(finite(p.hr)?Math.round(p.hr)+" bpm":"—")):(p.label+"・ペース "+fmtPaceSec(p.pace)+"・心拍 "+(finite(p.hr)?Math.round(p.hr)+" bpm":"—"));
+         out.textContent=state.axis==="lap"?(p.label+"・"+(segments[p.lap.segment_type]||"未分類")+"・"+fmtDist(p.lap.distance_m)+"・"+fmtTime(p.lap.duration_seconds)+"・ペース "+fmtPaceSec(p.pace)+"・平均心拍 "+(finite(p.hr)?Math.round(p.hr)+" bpm":"—")+"・最大心拍 "+(finite(p.lap.max_heart_rate_bpm)?Math.round(n(p.lap.max_heart_rate_bpm))+" bpm":"—")):(p.label+"・ペース "+fmtPaceSec(p.pace)+"・心拍 "+(finite(p.hr)?Math.round(p.hr)+" bpm":"—"));
        }
      });
      root().addEventListener("submit",e=>{if(e.target.id==="run-edit-form"){e.preventDefault();save(e.target);}});
