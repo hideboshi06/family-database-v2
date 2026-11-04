@@ -2,7 +2,7 @@
 "use strict";
 (function(){
  const root=()=>document.getElementById("running-root");
- const state={client:null,ready:false,loading:false,loaded:false,activities:[],shoes:[],races:[],view:"home",returnView:"home",selected:null,laps:[],points:[],axis:"time",editing:false,month:"",error:""};
+ const state={client:null,ready:false,loading:false,loaded:false,activities:[],shoes:[],races:[],view:"home",returnView:"home",selected:null,laps:[],points:[],axis:"time",lapPage:0,editing:false,month:"",error:""};
  const kinds={jog:"ジョグ",easy:"ジョグ",long_run:"ロング走",pace_run:"ペース走",tempo_run:"テンポ走",intervals:"インターバル走",interval:"インターバル走",repetition:"レペティション",race:"レース",other:"その他"};
  const segments={warmup:"アップ",work:"疾走",recovery:"回復",cooldown:"ダウン",steady:"一定走",unknown:"未分類"};
  const esc=x=>String(x==null?"":x).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -77,7 +77,7 @@
  }
  async function open(id){
    const a=state.activities.find(x=>x.id===id);if(!a)return;
-   state.returnView=state.view==="detail"?"history":state.view;state.view="detail";state.selected=a;state.axis="time";state.editing=false;state.laps=[];state.points=[];render();
+   state.returnView=state.view==="detail"?"history":state.view;state.view="detail";state.selected=a;state.axis="time";state.lapPage=0;state.editing=false;state.laps=[];state.points=[];render();
    try{
      const [l,p]=await Promise.all([
        state.client.from("running_laps").select("lap_index,distance_m,duration_seconds,avg_heart_rate_bpm,max_heart_rate_bpm,avg_pace_sec_per_km,segment_type").eq("activity_id",id).order("lap_index"),
@@ -124,7 +124,7 @@
    card(titlebar("ペース・心拍の推移")+
      '<div class="run-axis" role="tablist" aria-label="横軸の切替">'+[["time","時間"],["distance","距離"],["lap","ラップ"]].map(([k,v])=>'<button type="button" data-run-axis="'+k+'" aria-selected="'+(state.axis===k)+'" class="'+(state.axis===k?"active":"")+'">'+v+'</button>').join("")+'</div>'+
      '<div class="run-legend"><span><i class="run-swatch run-hr"></i>心拍：点＋線（左軸）</span><span><i class="run-swatch run-pace"></i>ペース：縦棒（右軸）</span></div>'+
-     '<div class="run-plot-wrap" id="run-plot"></div><p class="run-chart-hint" id="run-chart-info"></p>'+
+     '<div class="run-lap-pager" id="run-lap-pager" hidden><button type="button" data-run-lap-page="-1" aria-label="前のラップを表示">‹ 前へ</button><span id="run-lap-page-status" aria-live="polite"></span><button type="button" data-run-lap-page="1" aria-label="次のラップを表示">次へ ›</button></div><div class="run-plot-wrap" id="run-plot"></div><p class="run-chart-hint" id="run-chart-info"></p>'+
      '<div class="run-chart-note">時間は10分ごと、距離は1kmごとの平均。ラップは1区間1本（棒幅は同じ）で距離と練習種別を表示。速いペースほど棒が高くなるよ。</div>')+
    card(titlebar("Garminラップ")+(l?'<div class="run-table-wrap"><table class="run-table"><thead><tr><th>Lap</th><th>区間</th><th>距離</th><th>ペース</th><th>平均心拍</th></tr></thead><tbody>'+
      state.laps.map(x=>'<tr><td>'+esc(x.lap_index)+'</td><td>'+esc(segments[x.segment_type]||"—")+'</td><td>'+esc(fmtDist(x.distance_m))+'</td><td>'+esc(fmtPaceSec(x.avg_pace_sec_per_km))+'</td><td>'+esc(finite(x.avg_heart_rate_bpm)?x.avg_heart_rate_bpm+" bpm":"—")+'</td></tr>').join("")+'</tbody></table></div>':empty("FITにラップ情報がないよ。")))+
@@ -203,77 +203,120 @@
    });
  }
 
+
  function renderGraph(){
-   const target=$("#run-plot"),info=$("#run-chart-info");
+   const target=$("#run-plot"),info=$("#run-chart-info"),pager=$("#run-lap-pager");
    if(!target||!info)return;
-   const mode=state.axis, laps=state.laps, raw=state.points;
-   let samples;
+   const mode=state.axis,allLaps=state.laps,raw=state.points;
+   // Fit the SVG to the available content width, never a fixed wider canvas.
+   // No sideways scrolling on an iPhone. Extra interval laps use page controls.
+   const width=Math.max(260,Math.round(target.getBoundingClientRect().width||target.clientWidth||360));
+   const height=mode==="lap"?285:265,left=43,right=width-47,top=16,bottom=207;
+   const plotWidth=right-left;
+   let samples=[],shownLaps=[];
    if(mode==="lap"){
-     samples=laps.map((l,i)=>({x:i+0.5,hr:n(l.avg_heart_rate_bpm),pace:n(l.avg_pace_sec_per_km),label:"Lap "+l.lap_index,lap:l}));
-   }else samples=coarseRunningPoints(raw,state.selected,mode);
-   if(!samples.length){target.innerHTML=empty("この記録のグラフデータはまだないよ。");info.textContent="";return;}
-   // Equal-width lap columns keep 200m recoveries as readable as 400m efforts.
-   // Many short interval laps remain scrollable rather than being compressed.
-   const width=mode==="lap"?Math.max(480,samples.length*86+115):Math.max(mode==="time"?480:530,samples.length*(mode==="time"?105:80)+115),height=mode==="lap"?320:292,left=63,right=width-67,top=24,bottom=228;
-   const valuesH=samples.map(x=>x.hr).filter(Number.isFinite),valuesP=samples.map(x=>x.pace).filter(x=>Number.isFinite(x)&&x>0);
-   if(!valuesH.length&&!valuesP.length){target.innerHTML=empty("表示可能な心拍・ペースデータがないよ。");info.textContent="";return;}
-   let h0=Math.max(40,Math.floor(((valuesH.length?Math.min(...valuesH):100)-12)/10)*10),h1=Math.min(230,Math.ceil(((valuesH.length?Math.max(...valuesH):160)+12)/10)*10);
-   if(h1-h0<40){h0=Math.max(40,h0-20);h1=h0+60;}
-   let p0=valuesP.length?Math.max(60,Math.floor(Math.min(...valuesP)*0.90/30)*30):180;
-   let p1=valuesP.length?Math.ceil(Math.max(...valuesP)*1.1/30)*30:600;
-   if(p1-p0<90){p0=Math.max(60,p0-45);p1=p0+135;}
-   let xMin=0, xMax=mode==="lap"?samples.length:Math.max(...samples.map(s=>s.end));
-   if(xMax<=xMin)xMax=xMin+1;
-   const X=v=>left+(right-left)*(v-xMin)/(xMax-xMin);
-   const Yh=v=>bottom-(v-h0)/(h1-h0)*(bottom-top);
-   const Yp=v=>top+(v-p0)/(p1-p0)*(bottom-top);
-   const at=(v)=>Number(v.toFixed(2));
-   let svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+width+' '+height+'" style="min-width:'+width+'px" role="img" aria-label="心拍は青い点と線、ペースは橙色の棒グラフ">';
-   for(let i=0;i<=4;i++){
-     const y=top+(bottom-top)*i/4,hr=(h1-(h1-h0)*i/4).toFixed(0),pace=p0+(p1-p0)*i/4;
-     svg+='<line x1="'+left+'" x2="'+right+'" y1="'+y+'" y2="'+y+'" stroke="#e5edf4" stroke-dasharray="3 5"/>'+
-       '<text x="'+(left-9)+'" y="'+(y+4)+'" text-anchor="end" fill="#2d6595">'+hr+'</text>'+
-       '<text x="'+(right+10)+'" y="'+(y+4)+'" fill="#bd7243">'+esc(fmtPaceSec(pace).replace("/km",""))+'</text>';
-   }
-   svg+='<line x1="'+left+'" x2="'+right+'" y1="'+bottom+'" y2="'+bottom+'" stroke="#a8bbc9"/>';
-   if(mode==="lap"){
-     laps.forEach((l,i)=>{
-       const start=X(i),end=X(i+1);
-       const colors={work:"#e8f1fa",recovery:"#fff3e9",warmup:"#f1f5f8",cooldown:"#f1f5f8",steady:"#f7f9fb",unknown:i%2===0?"#f7f9fb":"#fff"};
-       svg+='<rect x="'+at(start)+'" y="'+top+'" width="'+at(end-start)+'" height="'+(bottom-top)+'" fill="'+(colors[l.segment_type]||"#f7f9fb")+'"/>';
-       svg+='<line x1="'+at(end)+'" x2="'+at(end)+'" y1="'+top+'" y2="'+bottom+'" stroke="#cfdee9" stroke-dasharray="2 4"/>';
-     });
-   }
-   for(let i=0;i<samples.length;i++){
-     const s=samples[i];if(!Number.isFinite(s.pace)||s.pace<=0)continue;
-     const px=X(s.x),prev=i?samples[i-1].x:xMin,next=i+1<samples.length?samples[i+1].x:xMax;
-     const available=Math.min((px-X(prev))*1.2,(X(next)-px)*1.2);
-     const barW=mode==="lap"?Math.min(54,(right-left)/Math.max(1,samples.length)*0.62):Math.max(20,Math.min(54,Math.max(20,available*.8)));
-     const y=Math.max(top,Math.min(bottom,Yp(s.pace)));
-     svg+='<rect x="'+at(px-barW/2)+'" y="'+at(y)+'" width="'+at(barW)+'" height="'+at(bottom-y)+'" rx="2" fill="#d9814b" fill-opacity=".58" stroke="#c7743e" stroke-opacity=".65" data-run-point="'+i+'"/>';
-   }
-   const hrPts=samples.filter(s=>Number.isFinite(s.hr));
-   if(hrPts.length>1)svg+='<polyline points="'+hrPts.map(s=>at(X(s.x))+","+at(Yh(s.hr))).join(" ")+'" fill="none" stroke="#2d6595" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>';
-   for(const s of hrPts){const ix=samples.indexOf(s);svg+='<circle cx="'+at(X(s.x))+'" cy="'+at(Yh(s.hr))+'" r="3.8" stroke="#fff" stroke-width="1.3" fill="#2d6595" data-run-point="'+ix+'"/>';}
-   if(mode==="lap"){
-     samples.forEach((s,i)=>{
-       const x=X(s.x),l=laps[i],part=segments[l.segment_type]||"未分類";
-       svg+='<text x="'+at(x)+'" y="247" text-anchor="middle" fill="#516c83" font-size="11" font-weight="700">L'+esc(l.lap_index)+'</text>';
-       svg+='<text x="'+at(x)+'" y="265" text-anchor="middle" fill="#6b7e8f" font-size="10">'+(finite(l.distance_m)?Math.round(n(l.distance_m))+"m":"—")+'</text>';
-       svg+='<text x="'+at(x)+'" y="281" text-anchor="middle" fill="#7d8d9e" font-size="10">'+esc(part)+'</text>';
-       // Full-column tap target so even a very short pace bar can be selected.
-       svg+='<rect x="'+at(X(i))+'" y="'+top+'" width="'+at(X(i+1)-X(i))+'" height="'+(bottom-top)+'" fill="transparent" data-run-point="'+i+'" aria-label="Lap '+esc(l.lap_index)+'"/>';
-     });
-     info.textContent=laps.length===1?"このFITのGarminラップは1件だよ。":"ラップをタップすると距離・ペース・平均／最大心拍を確認できるよ。";
-   }else{
-     const increment=mode==="time"?600:1000;
-     for(let value=0;value<=xMax+0.000001;value+=increment){
-       const x=X(value),text=mode==="time"?Math.round(value/60)+"分":(value/1000)+"km";
-       svg+='<text x="'+at(x)+'" y="251" text-anchor="middle" fill="#6b7e8f">'+esc(text)+'</text>';
+     const pageSize=width<420?6:width<660?9:12;
+     const pages=Math.max(1,Math.ceil(allLaps.length/pageSize));
+     state.lapPage=Math.max(0,Math.min(state.lapPage,pages-1));
+     const from=state.lapPage*pageSize;
+     shownLaps=allLaps.slice(from,from+pageSize);
+     samples=shownLaps.map((lap,i)=>({
+       x:i+0.5,hr:n(lap.avg_heart_rate_bpm),pace:n(lap.avg_pace_sec_per_km),
+       label:"Lap "+lap.lap_index,lap
+     }));
+     if(pager){
+       pager.hidden=pages<=1;
+       const status=pager.querySelector("#run-lap-page-status");
+       if(status)status.textContent=(from+1)+"〜"+(from+shownLaps.length)+" / "+allLaps.length+"ラップ";
+       const prev=pager.querySelector('[data-run-lap-page="-1"]'),next=pager.querySelector('[data-run-lap-page="1"]');
+       if(prev)prev.disabled=state.lapPage===0;
+       if(next)next.disabled=state.lapPage===pages-1;
      }
-     info.textContent=(mode==="time"?"10分ごと":"1kmごと")+"の平均。点や棒をタップすると区間の数値がわかるよ。";
+   }else{
+     samples=coarseRunningPoints(raw,state.selected,mode);
+     if(pager)pager.hidden=true;
    }
-   svg+='<text x="'+at((left+right)/2)+'" y="'+(mode==="lap"?311:282)+'" text-anchor="middle" fill="#6b7e8f">'+(mode==="time"?"経過時間":mode==="distance"?"累積距離 (km)":"Garminラップ（1ラップ＝1本・等間隔）")+'</text></svg>';
+   if(!samples.length){
+     target.innerHTML=empty(mode==="lap"?"この記録のGarminラップはまだないよ。":"この記録のグラフデータはまだないよ。");
+     info.textContent="";return;
+   }
+   const hrValues=samples.map(s=>s.hr).filter(Number.isFinite);
+   const paceValues=samples.map(s=>s.pace).filter(v=>Number.isFinite(v)&&v>0);
+   if(!hrValues.length&&!paceValues.length){
+     target.innerHTML=empty("表示可能な心拍・ペースデータがないよ。");
+     info.textContent="";return;
+   }
+   let hMin=Math.max(40,Math.floor(((hrValues.length?Math.min(...hrValues):100)-12)/10)*10);
+   let hMax=Math.min(230,Math.ceil(((hrValues.length?Math.max(...hrValues):160)+12)/10)*10);
+   if(hMax-hMin<40){hMin=Math.max(40,hMin-20);hMax=hMin+60;}
+   let pMin=paceValues.length?Math.max(60,Math.floor(Math.min(...paceValues)*.9/30)*30):180;
+   let pMax=paceValues.length?Math.ceil(Math.max(...paceValues)*1.1/30)*30:600;
+   if(pMax-pMin<90){pMin=Math.max(60,pMin-45);pMax=pMin+135;}
+   const xMin=0,xMax=mode==="lap"?samples.length:Math.max(...samples.map(s=>s.end));
+   const X=v=>left+plotWidth*(v-xMin)/Math.max(xMax-xMin,1);
+   const Yh=v=>bottom-(v-hMin)/(hMax-hMin)*(bottom-top);
+   // Larger values are slower: draw fast-pace bars higher.
+   const Yp=v=>top+(v-pMin)/(pMax-pMin)*(bottom-top);
+   const at=v=>Number(v.toFixed(2));
+   let svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+width+' '+height+'" width="100%" height="auto" preserveAspectRatio="xMidYMid meet" role="img" aria-label="平均心拍は青い点と線、平均ペースはオレンジの棒。横スクロールなしのグラフ">';
+   for(let i=0;i<=4;i++){
+     const y=at(top+(bottom-top)*i/4),hr=Math.round(hMax-(hMax-hMin)*i/4),pace=pMin+(pMax-pMin)*i/4;
+     svg+='<line x1="'+left+'" x2="'+right+'" y1="'+y+'" y2="'+y+'" stroke="#e4ebf1" stroke-dasharray="3 4"/>'+
+       '<text x="'+(left-6)+'" y="'+(y+3.5)+'" text-anchor="end" fill="#2d6595" font-size="10">'+hr+'</text>'+
+       '<text x="'+(right+5)+'" y="'+(y+3.5)+'" fill="#b16a40" font-size="10">'+esc(fmtPaceSec(pace).replace("/km",""))+'</text>';
+   }
+   svg+='<line x1="'+left+'" x2="'+right+'" y1="'+bottom+'" y2="'+bottom+'" stroke="#b3c3cf"/>';
+   if(mode==="lap"){
+     shownLaps.forEach((lap,i)=>{
+       const x=X(i),end=X(i+1);
+       const colors={work:"#e8f1fa",recovery:"#fff0e6",warmup:"#f2f5f7",cooldown:"#f2f5f7",steady:"#f8fafb",unknown:i%2?"#fff":"#f8fafb"};
+       svg+='<rect x="'+at(x)+'" y="'+top+'" width="'+at(end-x)+'" height="'+(bottom-top)+'" fill="'+(colors[lap.segment_type]||"#f7f9fb")+'"/>'+
+         '<line x1="'+at(end)+'" x2="'+at(end)+'" y1="'+top+'" y2="'+bottom+'" stroke="#dbe5ed" stroke-dasharray="2 4"/>';
+     });
+   }
+   samples.forEach((s,i)=>{
+     if(!Number.isFinite(s.pace)||s.pace<=0)return;
+     const center=X(s.x),span=mode==="lap"?plotWidth/samples.length:X(s.end)-X(s.start);
+     const barW=Math.max(4,Math.min(mode==="lap"?48:44,span*.64));
+     const y=Math.max(top,Math.min(bottom,Yp(s.pace)));
+     svg+='<rect x="'+at(center-barW/2)+'" y="'+at(y)+'" width="'+at(barW)+'" height="'+at(bottom-y)+'" rx="2" fill="#dc8954" fill-opacity=".78" stroke="#cb7845" stroke-opacity=".6"/>';
+   });
+   // The blue heart-rate line is drawn on top of the orange pace bars.
+   const hrSamples=samples.filter(s=>Number.isFinite(s.hr));
+   if(hrSamples.length>1)
+     svg+='<polyline points="'+hrSamples.map(s=>at(X(s.x))+","+at(Yh(s.hr))).join(" ")+'" fill="none" stroke="#2d6595" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>';
+   for(const s of hrSamples)
+     svg+='<circle cx="'+at(X(s.x))+'" cy="'+at(Yh(s.hr))+'" r="'+(width<380?3.7:4.4)+'" fill="#2d6595" stroke="#fff" stroke-width="1.2"/>';
+   if(mode==="lap"){
+     shownLaps.forEach((lap,i)=>{
+       const x=at(X(i+.5)),label=segments[lap.segment_type]||"未分類";
+       svg+='<text x="'+x+'" y="225" fill="#536f86" text-anchor="middle" font-size="10" font-weight="700">L'+esc(lap.lap_index)+'</text>'+
+         '<text x="'+x+'" y="241" fill="#6b7e8f" text-anchor="middle" font-size="9">'+(finite(lap.distance_m)?Math.round(n(lap.distance_m))+"m":"—")+'</text>';
+       if(shownLaps.length<=6)
+         svg+='<text x="'+x+'" y="255" fill="#73899b" text-anchor="middle" font-size="9">'+esc(label)+'</text>';
+       svg+='<rect x="'+at(X(i))+'" y="'+top+'" width="'+at(X(i+1)-X(i))+'" height="'+(bottom-top)+'" fill="transparent" data-run-point="'+i+'" aria-label="Lap '+esc(lap.lap_index)+'"/>';
+     });
+     info.textContent=allLaps.length===1?
+       "このFITに記録されたGarminラップは1件だよ。":
+       "ラップをタップすると距離・時間・平均ペース・平均／最大心拍を確認できるよ。";
+   }else{
+     const step=mode==="time"?600:1000;
+     const tickCount=Math.floor(xMax/step);
+     const maxTickCount=Math.max(2,Math.floor(plotWidth/47));
+     const stride=Math.max(1,Math.ceil(tickCount/maxTickCount));
+     for(let t=0;t<=tickCount;t+=stride){
+       const value=t*step,x=at(X(value));
+       svg+='<text x="'+x+'" y="225" text-anchor="middle" fill="#6b7e8f" font-size="10">'+esc(mode==="time"?t*10+"分":t+"km")+'</text>';
+     }
+     // Wider transparent columns make small mobile bars/points easy to select.
+     samples.forEach((s,i)=>{
+       const x=at(X(s.start)),w=at(Math.max(1,X(s.end)-X(s.start)));
+       svg+='<rect x="'+x+'" y="'+top+'" width="'+w+'" height="'+(bottom-top)+'" fill="transparent" data-run-point="'+i+'" aria-label="'+esc(s.label)+'"/>';
+     });
+     info.textContent=(mode==="time"?"10分":"1km")+"単位の平均。棒や点をタップすると区間の数値を確認できるよ。";
+   }
+   svg+='<text x="'+at((left+right)/2)+'" y="'+(mode==="lap"?277:256)+'" text-anchor="middle" font-size="10" fill="#6b7e8f">'+
+     (mode==="time"?"経過時間":mode==="distance"?"累積距離":"Garminラップ（1本＝1ラップ）")+'</text></svg>';
    target.innerHTML=svg;
    target._pointSamples=samples;
  }
@@ -300,7 +343,14 @@
        if(b.dataset.runNav){state.view=b.dataset.runNav;render();return;}
        if(b.dataset.runOpen){open(b.dataset.runOpen);return;}
        if(b.dataset.runMonth){state.month=changeMonth(state.month,Number(b.dataset.runMonth));render();return;}
-       if(b.dataset.runAxis){state.axis=b.dataset.runAxis;renderGraph();root().querySelectorAll("[data-run-axis]").forEach(x=>{x.classList.toggle("active",x.dataset.runAxis===state.axis);x.setAttribute("aria-selected",x.dataset.runAxis===state.axis?"true":"false");});return;}
+       if(b.dataset.runAxis){state.axis=b.dataset.runAxis;state.lapPage=0;renderGraph();root().querySelectorAll("[data-run-axis]").forEach(x=>{x.classList.toggle("active",x.dataset.runAxis===state.axis);x.setAttribute("aria-selected",x.dataset.runAxis===state.axis?"true":"false");});return;}
+       if(b.dataset.runLapPage!==undefined){
+         const width=$("#run-plot")?.clientWidth||360;
+         const pageSize=width<420?6:width<660?9:12;
+         const totalPages=Math.max(1,Math.ceil(state.laps.length/pageSize));
+         state.lapPage=Math.max(0,Math.min(totalPages-1,state.lapPage+Number(b.dataset.runLapPage)));
+         renderGraph();return;
+       }
        if(b.dataset.runEdit!==undefined){state.editing=b.dataset.runEdit==="1";renderDetail();return;}
        if(b.dataset.runPoint!==undefined){
          const points=$("#run-plot")?._pointSamples||[],p=points[Number(b.dataset.runPoint)],out=$("#run-chart-info");if(!p||!out)return;

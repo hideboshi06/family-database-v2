@@ -48,9 +48,14 @@
 .running-page .run-swatch{display:inline-block;width:18px;height:4px;border-radius:2px}
 .running-page .run-hr{background:var(--navy)}
 .running-page .run-pace{background:#d9814b}
-.running-page .run-plot-wrap{width:100%;overflow-x:auto;scrollbar-width:thin}
-.running-page .run-plot-wrap svg{display:block;height:auto;max-width:none;cursor:crosshair}
-.running-page .run-plot-wrap svg text{font-family:inherit;font-size:11px}
+.running-page .run-plot-wrap{width:100%;min-width:0;overflow-x:hidden}
+.running-page .run-plot-wrap svg{display:block;width:100%;max-width:100%;height:auto;overflow:visible;touch-action:manipulation}
+.running-page .run-plot-wrap svg text{font-family:inherit}
+.running-page .run-lap-pager{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 10px}
+.running-page .run-lap-pager[hidden]{display:none}
+.running-page .run-lap-pager button{background:#f1f6fa;border:1px solid #d4e3ee;color:var(--navy);border-radius:9px;padding:8px 11px;font-size:12px;font-weight:700;min-height:36px}
+.running-page .run-lap-pager button:disabled{opacity:.35;cursor:default}
+.running-page .run-lap-pager span{font-size:11px;font-weight:700;color:var(--sub);text-align:center}
 .running-page .run-plot-wrap svg circle[data-run-point],.running-page .run-plot-wrap svg rect[data-run-point]{cursor:pointer}
 .running-page .run-chart-hint{padding:10px;background:#f0f6fb;border:1px solid #e2edf5;color:#51728d;border-radius:9px;font-size:11px;margin:9px 0}
 .running-page .run-chart-note{font-size:11px;color:var(--sub)}
