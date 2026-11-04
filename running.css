@@ -77,3 +77,12 @@
 .running-page .run-textnote p{white-space:pre-wrap;overflow-wrap:anywhere}
 @media(min-width:660px){.running-page .run-metrics{grid-template-columns:repeat(4,minmax(0,1fr))}.running-page .run-card{padding:18px}.running-page .run-stat strong{font-size:24px}}
 @media(max-width:390px){.running-page .run-stat strong{font-size:18px}.running-page .run-badge{display:none}.running-page .run-axis button{font-size:10px}}
+
+
+/* Compact effort estimate; based on manually recorded RPE, not Garmin EPOC. */
+.running-page .run-effort-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.running-page .run-effort-item{background:#f7fafc;border:1px solid #edf2f6;border-radius:10px;padding:11px 12px;min-width:0}
+.running-page .run-effort-item span{display:block;font-size:11px;color:var(--sub)}
+.running-page .run-effort-item strong{display:block;font-size:19px;line-height:1.4;margin-top:3px;color:var(--ink);font-weight:800;font-variant-numeric:tabular-nums}
+.running-page .run-effort-meta{font-size:11px;color:var(--sub);margin-top:9px}
+.running-page .run-chart-hint[hidden]{display:none}

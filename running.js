@@ -115,17 +115,36 @@
           (a.pain_note?'<div class="run-textnote"><small>違和感・痛み</small><p>'+esc(a.pain_note)+'</p></div>':"")+
           (a.memo?'<div class="run-textnote"><small>メモ</small><p>'+esc(a.memo)+'</p></div>':"");
  }
+
+ // Session-RPE load: subjective exertion 1–10 times moving duration in minutes.
+ // This is not Garmin's EPOC exercise load, nor an objective fatigue diagnosis.
+ function effortCard(a){
+   const rpe=a.rpe==null?NaN:Number(a.rpe);
+   const valid=Number.isInteger(rpe)&&rpe>=1&&rpe<=10;
+   const category=!valid?"未入力":rpe<=3?"イージー":rpe<=6?"中強度":"高強度";
+   const minutes=finite(a.moving_time_seconds)?n(a.moving_time_seconds)/60:NaN;
+   const score=valid&&Number.isFinite(minutes)&&minutes>0?Math.round(rpe*minutes):null;
+   const detail=valid?"体感 "+rpe+"/10"+(score!==null?" × "+minutes.toFixed(1)+"分":""):"RPEを入力すると計算するよ";
+   return card(
+     titlebar("運動負荷",smallbtn(valid?"RPEを変更":"RPEを入力",'data-run-edit="1"'))+
+     '<div class="run-effort-metrics">'+
+       '<div class="run-effort-item"><span>体感強度</span><strong>'+esc(category)+'</strong></div>'+
+       '<div class="run-effort-item"><span>負荷スコア</span><strong>'+esc(score===null?"—":score+" pt")+'</strong></div>'+
+     '</div><div class="run-effort-meta">'+esc(detail)+'</div>'
+   );
+ }
+
  function renderDetail(){
    const a=state.selected,el=root();if(!a||!el)return;
    const g=state.points.length, l=state.laps.length;
    el.innerHTML='<button class="run-back" type="button" data-run-back="1">‹ ランニングに戻る</button>'+
    card('<div class="run-hero-label">Garmin FIT · '+esc(fdate(a.started_at))+'</div><h2 class="run-title">'+esc(a.title||"ランニング")+'</h2>'+metricCard(a)+
    '<div class="run-details-strip"><span>最大心拍 '+esc(finite(a.max_heart_rate_bpm)?a.max_heart_rate_bpm+" bpm":"—")+'</span><span>Garminラップ '+l+'件</span><span>グラフ '+g+'点</span></div>')+
+   effortCard(a)+
    card(titlebar("ペース・心拍の推移")+
      '<div class="run-axis" role="tablist" aria-label="横軸の切替">'+[["time","時間"],["distance","距離"],["lap","ラップ"]].map(([k,v])=>'<button type="button" data-run-axis="'+k+'" aria-selected="'+(state.axis===k)+'" class="'+(state.axis===k?"active":"")+'">'+v+'</button>').join("")+'</div>'+
      '<div class="run-legend"><span><i class="run-swatch run-hr"></i>心拍：点＋線（左軸）</span><span><i class="run-swatch run-pace"></i>ペース：縦棒（右軸）</span></div>'+
-     '<div class="run-lap-pager" id="run-lap-pager" hidden><button type="button" data-run-lap-page="-1" aria-label="前のラップを表示">‹ 前へ</button><span id="run-lap-page-status" aria-live="polite"></span><button type="button" data-run-lap-page="1" aria-label="次のラップを表示">次へ ›</button></div><div class="run-plot-wrap" id="run-plot"></div><p class="run-chart-hint" id="run-chart-info"></p>'+
-     '<div class="run-chart-note">時間は10分ごと、距離は1kmごとの平均。ラップは1区間1本（棒幅は同じ）で距離と練習種別を表示。速いペースほど棒が高くなるよ。</div>')+
+     '<div class="run-lap-pager" id="run-lap-pager" hidden><button type="button" data-run-lap-page="-1" aria-label="前のラップを表示">‹ 前へ</button><span id="run-lap-page-status" aria-live="polite"></span><button type="button" data-run-lap-page="1" aria-label="次のラップを表示">次へ ›</button></div><div class="run-plot-wrap" id="run-plot"></div><p class="run-chart-hint" id="run-chart-info" hidden></p>')+
    card(titlebar("Garminラップ")+(l?'<div class="run-table-wrap"><table class="run-table"><thead><tr><th>Lap</th><th>区間</th><th>距離</th><th>ペース</th><th>平均心拍</th></tr></thead><tbody>'+
      state.laps.map(x=>'<tr><td>'+esc(x.lap_index)+'</td><td>'+esc(segments[x.segment_type]||"—")+'</td><td>'+esc(fmtDist(x.distance_m))+'</td><td>'+esc(fmtPaceSec(x.avg_pace_sec_per_km))+'</td><td>'+esc(finite(x.avg_heart_rate_bpm)?x.avg_heart_rate_bpm+" bpm":"—")+'</td></tr>').join("")+'</tbody></table></div>':empty("FITにラップ情報がないよ。")))+
    card(titlebar("練習メモ",!state.editing?smallbtn("編集する",'data-run-edit="1"'):"")+(state.editing?form(a):detailMeta(a)));
@@ -296,9 +315,7 @@
          svg+='<text x="'+x+'" y="255" fill="#73899b" text-anchor="middle" font-size="9">'+esc(label)+'</text>';
        svg+='<rect x="'+at(X(i))+'" y="'+top+'" width="'+at(X(i+1)-X(i))+'" height="'+(bottom-top)+'" fill="transparent" data-run-point="'+i+'" aria-label="Lap '+esc(lap.lap_index)+'"/>';
      });
-     info.textContent=allLaps.length===1?
-       "このFITに記録されたGarminラップは1件だよ。":
-       "ラップをタップすると距離・時間・平均ペース・平均／最大心拍を確認できるよ。";
+     // Keep the footer hidden until a graph segment is selected.
    }else{
      const step=mode==="time"?600:1000;
      const tickCount=Math.floor(xMax/step);
@@ -313,12 +330,14 @@
        const x=at(X(s.start)),w=at(Math.max(1,X(s.end)-X(s.start)));
        svg+='<rect x="'+x+'" y="'+top+'" width="'+w+'" height="'+(bottom-top)+'" fill="transparent" data-run-point="'+i+'" aria-label="'+esc(s.label)+'"/>';
      });
-     info.textContent=(mode==="time"?"10分":"1km")+"単位の平均。棒や点をタップすると区間の数値を確認できるよ。";
+     // Keep the footer hidden until a graph segment is selected.
    }
    svg+='<text x="'+at((left+right)/2)+'" y="'+(mode==="lap"?277:256)+'" text-anchor="middle" font-size="10" fill="#6b7e8f">'+
      (mode==="time"?"経過時間":mode==="distance"?"累積距離":"Garminラップ（1本＝1ラップ）")+'</text></svg>';
    target.innerHTML=svg;
    target._pointSamples=samples;
+   info.textContent="";
+   info.hidden=true;
  }
  async function save(form){
    const a=state.selected;if(!a)return;
@@ -351,10 +370,16 @@
          state.lapPage=Math.max(0,Math.min(totalPages-1,state.lapPage+Number(b.dataset.runLapPage)));
          renderGraph();return;
        }
-       if(b.dataset.runEdit!==undefined){state.editing=b.dataset.runEdit==="1";renderDetail();return;}
+       if(b.dataset.runEdit!==undefined){
+         state.editing=b.dataset.runEdit==="1";
+         renderDetail();
+         if(state.editing)$("#run-edit-form")?.scrollIntoView({behavior:"smooth",block:"start"});
+         return;
+       }
        if(b.dataset.runPoint!==undefined){
          const points=$("#run-plot")?._pointSamples||[],p=points[Number(b.dataset.runPoint)],out=$("#run-chart-info");if(!p||!out)return;
          out.textContent=state.axis==="lap"?(p.label+"・"+(segments[p.lap.segment_type]||"未分類")+"・"+fmtDist(p.lap.distance_m)+"・"+fmtTime(p.lap.duration_seconds)+"・ペース "+fmtPaceSec(p.pace)+"・平均心拍 "+(finite(p.hr)?Math.round(p.hr)+" bpm":"—")+"・最大心拍 "+(finite(p.lap.max_heart_rate_bpm)?Math.round(n(p.lap.max_heart_rate_bpm))+" bpm":"—")):(p.label+"・ペース "+fmtPaceSec(p.pace)+"・心拍 "+(finite(p.hr)?Math.round(p.hr)+" bpm":"—"));
+         out.hidden=false;
        }
      });
      root().addEventListener("submit",e=>{if(e.target.id==="run-edit-form"){e.preventDefault();save(e.target);}});
