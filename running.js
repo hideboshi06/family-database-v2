@@ -118,20 +118,43 @@
 
  // Session-RPE load: subjective exertion 1–10 times moving duration in minutes.
  // This is not Garmin's EPOC exercise load, nor an objective fatigue diagnosis.
+
+ // Optional, fully automatic comparison of runs at broadly similar distance
+ // and moving pace. A heart-rate difference is descriptive, not a diagnosis
+ // of fatigue or a medically validated training-load measurement.
+ function automaticComparison(a){
+   const d=n(a.distance_m),t=n(a.moving_time_seconds),hr=n(a.avg_heart_rate_bpm);
+   if(!(d>=3000&&t>=1200&&Number.isFinite(hr)&&hr>0))return null;
+   const pace=t*1000/d;
+   const other=state.activities.filter(b=>{
+     if(b.id===a.id||!finite(b.distance_m)||!finite(b.moving_time_seconds)||!finite(b.avg_heart_rate_bpm))return false;
+     const bd=n(b.distance_m),bt=n(b.moving_time_seconds);
+     if(bd<3000||bt<1200||n(b.avg_heart_rate_bpm)<1)return false;
+     const bp=bt*1000/bd;
+     return Math.abs(bd-d)/d<=.07&&Math.abs(bp-pace)/pace<=.08;
+   });
+   if(other.length<2)return {count:other.length};
+   const baseline=other.reduce((sum,b)=>sum+n(b.avg_heart_rate_bpm),0)/other.length;
+   return {count:other.length,baseline,diff:hr-baseline};
+ }
  function effortCard(a){
-   const rpe=a.rpe==null?NaN:Number(a.rpe);
-   const valid=Number.isInteger(rpe)&&rpe>=1&&rpe<=10;
-   const category=!valid?"未入力":rpe<=3?"イージー":rpe<=6?"中強度":"高強度";
-   const minutes=finite(a.moving_time_seconds)?n(a.moving_time_seconds)/60:NaN;
-   const score=valid&&Number.isFinite(minutes)&&minutes>0?Math.round(rpe*minutes):null;
-   const detail=valid?"体感 "+rpe+"/10"+(score!==null?" × "+minutes.toFixed(1)+"分":""):"RPEを入力すると計算するよ";
-   return card(
-     titlebar("運動負荷",smallbtn(valid?"RPEを変更":"RPEを入力",'data-run-edit="1"'))+
+   const comparison=automaticComparison(a);
+   if(!comparison){
+     return card(titlebar("ランニング比較")+
+       '<div class="run-effort-meta">同じくらいの距離・ペースの記録が増えると、心拍の比較ができるよ。入力は不要。</div>');
+   }
+   if(comparison.count<2){
+     return card(titlebar("ランニング比較")+
+       '<div class="run-effort-meta">近い距離・ペースのランがあと'+(2-comparison.count)+'件増えると、平均心拍を比べられるよ。</div>');
+   }
+   const d=Math.round(comparison.diff);
+   const delta=d>0?"+"+d:d.toString();
+   const descriptor=Math.abs(d)<=3?"ほぼ同じ":d>0?"やや高め":"やや低め";
+   return card(titlebar("ランニング比較")+
      '<div class="run-effort-metrics">'+
-       '<div class="run-effort-item"><span>体感強度</span><strong>'+esc(category)+'</strong></div>'+
-       '<div class="run-effort-item"><span>負荷スコア</span><strong>'+esc(score===null?"—":score+" pt")+'</strong></div>'+
-     '</div><div class="run-effort-meta">'+esc(detail)+'</div>'
-   );
+       '<div class="run-effort-item"><span>近い条件の平均心拍</span><strong>'+Math.round(comparison.baseline)+' bpm</strong></div>'+
+       '<div class="run-effort-item"><span>今回との差</span><strong>'+esc(delta)+' bpm</strong></div>'+
+     '</div><div class="run-effort-meta">'+esc(comparison.count)+'件の近い距離・ペースと比較：'+esc(descriptor)+'。心拍差だけで疲労や負荷は断定できないよ。</div>');
  }
 
  function renderDetail(){
@@ -147,7 +170,7 @@
      '<div class="run-lap-pager" id="run-lap-pager" hidden><button type="button" data-run-lap-page="-1" aria-label="前のラップを表示">‹ 前へ</button><span id="run-lap-page-status" aria-live="polite"></span><button type="button" data-run-lap-page="1" aria-label="次のラップを表示">次へ ›</button></div><div class="run-plot-wrap" id="run-plot"></div><p class="run-chart-hint" id="run-chart-info" hidden></p>')+
    card(titlebar("Garminラップ")+(l?'<div class="run-table-wrap"><table class="run-table"><thead><tr><th>Lap</th><th>区間</th><th>距離</th><th>ペース</th><th>平均心拍</th></tr></thead><tbody>'+
      state.laps.map(x=>'<tr><td>'+esc(x.lap_index)+'</td><td>'+esc(segments[x.segment_type]||"—")+'</td><td>'+esc(fmtDist(x.distance_m))+'</td><td>'+esc(fmtPaceSec(x.avg_pace_sec_per_km))+'</td><td>'+esc(finite(x.avg_heart_rate_bpm)?x.avg_heart_rate_bpm+" bpm":"—")+'</td></tr>').join("")+'</tbody></table></div>':empty("FITにラップ情報がないよ。")))+
-   card(titlebar("練習メモ",!state.editing?smallbtn("編集する",'data-run-edit="1"'):"")+(state.editing?form(a):detailMeta(a)));
+   card(titlebar("練習メモ（任意）",!state.editing?smallbtn("必要なときだけ編集",'data-run-edit="1"'):"")+(state.editing?form(a):detailMeta(a)));
    renderGraph();
  }
 
