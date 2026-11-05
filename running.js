@@ -27,7 +27,7 @@
  const titlebar=(title,extra="")=>'<div class="run-heading"><h2>'+title+"</h2>"+extra+"</div>";
  const smallbtn=(title,action)=>'<button type="button" class="btn secondary smallbtn" '+action+">"+title+"</button>";
  const nav=()=>'<div class="run-sections" role="tablist" aria-label="ランニング画面">'+
-  [["home","概要"],["history","練習履歴"],["shoes","シューズ"],["races","大会"]].map(([key,title])=>'<button type="button" data-run-nav="'+key+'" class="'+(state.view===key?"active":"")+'" aria-selected="'+(state.view===key)+'">'+title+"</button>").join("")+"</div>";
+  [["home","概要"],["history","ランニング履歴"],["shoes","シューズ"],["races","大会"]].map(([key,title])=>'<button type="button" data-run-nav="'+key+'" class="'+(state.view===key?"active":"")+'" aria-selected="'+(state.view===key)+'">'+title+"</button>").join("")+"</div>";
  const error=msg=>card('<p class="status err" role="alert">'+esc(msg)+'</p>'+smallbtn("再読み込み",'data-run-retry="1"'));
  const empty=msg=>'<div class="run-empty">'+esc(msg)+"</div>";
 
@@ -57,6 +57,10 @@
    return {work,recovery,confirmed:work.length>=2&&recovery.length>=1};
  }
  function autoRunTitle(a){
+   // When a run is linked to a registered race, show the official race name
+   // consistently in recent runs, history and details. Keep the FIT title intact.
+   const linkedRace=a.race_id?state.races.find(r=>r.id===a.race_id):null;
+   if(linkedRace?.race_name)return linkedRace.race_name;
    const min=finite(a.moving_time_seconds)&&n(a.moving_time_seconds)>0?n(a.moving_time_seconds)/60:NaN;
    // Rounded duration is for a short title only; the exact time is unchanged
    // in the running stats and activity detail.
@@ -168,7 +172,7 @@
      smallbtn("すべて見る ›",'data-run-nav="history"')+'</div></div>'+
      recentWeekRows()+'<p class="small run-off-note">記録のない日は「オフ」と表示</p>');
  };
- const history=()=>card(titlebar("練習履歴",'<span class="small">'+state.activities.length+'件</span>')+(state.activities.length?state.activities.map(renderRow).join(""):empty("記録がまだないよ。")));
+ const history=()=>card(titlebar("ランニング履歴",'<span class="small">'+state.activities.length+'件</span>')+(state.activities.length?state.activities.map(renderRow).join(""):empty("記録がまだないよ。")));
 
  // Shoe and race master data are entered once, not after every run.
  // Each form writes through the authenticated Supabase client and existing RLS.
