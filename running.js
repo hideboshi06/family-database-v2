@@ -415,7 +415,7 @@
    state.loading=true;state.error="";render();
    try{
      const [a,s,r,tagged]=await Promise.all([
-       state.client.from("running_activities").select("id,garmin_activity_id,started_at,title,activity_type,distance_m,moving_time_seconds,elapsed_time_seconds,avg_heart_rate_bpm,max_heart_rate_bpm,avg_cadence_spm,training_type,shoe_id,race_id,rpe,fatigue,pain_note,memo,raw_summary").order("started_at",{ascending:false}).limit(1000),
+       state.client.from("running_activities").select("id,garmin_activity_id,started_at,title,activity_type,distance_m,moving_time_seconds,elapsed_time_seconds,avg_heart_rate_bpm,max_heart_rate_bpm,avg_cadence_spm,avg_stride_length_cm,training_type,shoe_id,race_id,rpe,fatigue,pain_note,memo,raw_summary").order("started_at",{ascending:false}).limit(1000),
        state.client.from("running_shoes").select("id,shoe_name,brand,model,garmin_gear_id,started_on,retired_on,baseline_distance_m").order("shoe_name"),
        state.client.from("running_races").select("id,race_name,race_date,race_month,distance_m,location,official_url,registration_status,priority,target_time_seconds").order("race_date",{ascending:true,nullsFirst:false}),
        state.client.from("running_laps").select("activity_id,lap_index,distance_m,segment_type").in("segment_type",["work","recovery"]).order("lap_index").limit(1000)
@@ -446,9 +446,20 @@
      state.laps=checked(l);state.points=checked(p);renderDetail();
    }catch(e){if(state.selected?.id===id){state.error="グラフを読み込めなかったよ: "+(e.message||String(e));render();}}
  }
+ function strideSourceLabel(a){
+   const source=a.raw_summary?.stride_length_source;
+   if(source==="garmin_connect_user_reported")return "Garmin Connect表示値（本人提供）";
+   if(source==="estimated_from_distance_time_cadence")return "距離・走行時間・ピッチから計算した推定値";
+   if(source==="garmin_api")return "Garmin API取得値";
+   return "取得元未確認";
+ }
  function metricCard(a){
    const values=[["走行距離",fmtDist(a.distance_m)],["走行時間",fmtTime(a.moving_time_seconds)],["平均ペース",fmtPace(a.moving_time_seconds,a.distance_m)],["平均心拍",finite(a.avg_heart_rate_bpm)?a.avg_heart_rate_bpm+" bpm":"—"]];
-   return '<div class="run-metrics">'+values.map(([k,v])=>'<div class="run-stat"><div>'+k+'</div><strong>'+esc(v)+'</strong></div>').join("")+'</div>';
+   if(finite(a.avg_cadence_spm)&&n(a.avg_cadence_spm)>0)values.push(["平均ピッチ",Math.round(n(a.avg_cadence_spm))+" spm"]);
+   if(finite(a.avg_stride_length_cm)&&n(a.avg_stride_length_cm)>0)values.push(["平均歩幅",(n(a.avg_stride_length_cm)/100).toFixed(2)+" m"]);
+   const sourceNote=finite(a.avg_stride_length_cm)&&n(a.avg_stride_length_cm)>0?
+     '<p class="small run-stride-source">歩幅の出典：'+esc(strideSourceLabel(a))+'。フォームの調子は心拍・ペースとあわせて判断しよう。</p>':"";
+   return '<div class="run-metrics">'+values.map(([k,v])=>'<div class="run-stat"><div>'+k+'</div><strong>'+esc(v)+'</strong></div>').join("")+'</div>'+sourceNote;
  }
  const field=(id,l,html)=>'<label class="run-field"><span>'+l+'</span>'+html+"</label>";
  const options=(values,current)=>values.map(([v,name])=>'<option value="'+esc(v)+'" '+(String(current||"")===v?"selected":"")+'>'+esc(name)+"</option>").join("");
