@@ -307,7 +307,7 @@
    const repairTarget=state.activities.find(a=>
      a.raw_summary?.sync_source==="garmin_personal_api_edge_v1" &&
      !Array.isArray(a.raw_summary?.hr_zones_seconds) &&
-     /^\\d{6,20}$/.test(String(a.garmin_activity_id||""))
+     /^\d{6,20}$/.test(String(a.garmin_activity_id||""))
    );
    const repairButton=!state.syncLoading && repairTarget?
      '<button type="button" class="btn secondary smallbtn" data-run-sync-repair="'+esc(repairTarget.garmin_activity_id)+'">過去の取り込みを修復</button>':"";
@@ -383,7 +383,7 @@
      if(!data?.ok)throw new Error(data?.error||"確認結果が取得できなかったよ。");
      const pending=Number(data.pending),items=Array.isArray(data.next)?data.next:[];
      if(!Number.isInteger(pending)||pending<0||pending!==items.length||
-       !items.every(item=>/^\\d{6,20}$/.test(String(item.garminId||""))))
+       !items.every(item=>/^\d{6,20}$/.test(String(item.garminId||""))))
        throw new Error("確認結果の形式が不正だよ。");
      state.syncCandidates=items.map(item=>({
        garminId:String(item.garminId),title:String(item.title||""),startedAt:item.startedAt||null
