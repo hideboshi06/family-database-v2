@@ -278,6 +278,14 @@
    const checkButton=canCheck?
      smallbtn(state.syncLoading?"確認中…":"更新を確認",
        'data-run-sync-preview="1"'+(state.syncLoading?' disabled aria-busy="true"':"")):"";
+   const repairTarget=state.activities.find(a=>
+     a.raw_summary?.sync_source==="garmin_personal_api_edge_v1" &&
+     !Array.isArray(a.raw_summary?.hr_zones_seconds) &&
+     /^\d{6,20}$/.test(String(a.garmin_activity_id||""))
+   );
+   const repairButton=canCheck&&repairTarget?
+     '<button type="button" class="btn smallbtn" data-run-sync-repair="'+esc(repairTarget.garmin_activity_id)+'"'+
+       (state.syncLoading?' disabled aria-busy="true"':"")+'>心拍ゾーン・ピッチを再計算</button>':"";
    const importButton=canCheck&&state.syncCandidate&&!state.syncImportedOnce?
      '<button type="button" class="btn smallbtn" data-run-sync-one="1"'+
        (state.syncLoading?' disabled aria-busy="true"':"")+'>1件だけ取り込む</button>':"";
@@ -289,7 +297,7 @@
      '（'+esc(state.syncCandidate.startedAt?fdate(state.syncCandidate.startedAt):"日時不明")+'）</p>':"";
    return card(titlebar("Garmin Connect",checkButton)+
      '<p class="small" role="status">'+esc(hint)+'</p>'+candidate+
-     (importButton?'<div class="run-entry-actions">'+importButton+'</div>':""),"run-sync-card");
+     ((repairButton||importButton)?'<div class="run-entry-actions">'+repairButton+importButton+'</div>':""),"run-sync-card");
  }
  function render(){
   const el=root();if(!el)return;
@@ -368,6 +376,40 @@
      render();
    }
  }
+ async function repairImportedGarmin(garminId){
+   if(state.role!=="admin"||state.syncLoading||!state.client)return;
+   const target=state.activities.find(a=>a.garmin_activity_id===garminId &&
+     a.raw_summary?.sync_source==="garmin_personal_api_edge_v1");
+   if(!target || Array.isArray(target.raw_summary?.hr_zones_seconds))return;
+   if(!window.confirm("11/5の既存のランを再解析して、心拍ゾーンと平均ピッチだけ修正するよ。\n"+
+       "距離・時間・メモ・シューズ・グラフは変更しないよ。実行していい？"))return;
+   state.syncLoading=true;
+   state.syncMessage="保存済みFITから心拍ゾーンとピッチを再計算中…";
+   render();
+   try{
+     const {data,error:invokeError}=await state.client.functions.invoke("garmin-sync",{
+       body:{action:"repair-imported",garminActivityId:garminId}
+     });
+     if(invokeError){
+       let reason="";
+       try{reason=String((await invokeError.context?.json())?.error||"");}catch{}
+       throw new Error(reason||invokeError.message);
+     }
+     if(!data?.ok || Number(data.repaired)!==1)throw new Error(data?.error||"再計算の保存を確認できなかったよ。");
+     if(String(data.garminActivityId)!==garminId)throw new Error("記録の照合が一致しなかったよ。");
+     await load();
+     const zones=Array.isArray(data.zoneSeconds)?data.zoneSeconds:null;
+     state.syncMessage="再計算を保存したよ！平均ピッチ "+data.cadenceSpm+" spm"+
+       (zones?"、心拍ゾーン計 "+zones.reduce((s,n)=>s+Number(n),0)+"秒。":"。");
+   }catch(e){
+     console.warn("Garmin analysis repair failed:",e);
+     state.syncMessage="再計算でエラーが出たよ："+(e?.message||"詳細不明")+
+       "。既存記録はそのままなので、追加の取り込みはしないでね。";
+   }finally{
+     state.syncLoading=false;
+     render();
+   }
+ }
  async function load(){
    if(!state.ready||state.loading)return;
    state.loading=true;state.error="";render();
@@ -379,6 +421,8 @@
        state.client.from("running_laps").select("activity_id,lap_index,distance_m,segment_type").in("segment_type",["work","recovery"]).order("lap_index").limit(1000)
      ]);
      state.activities=checked(a);state.shoes=checked(s);state.races=checked(r);
+     if(state.activities.some(x=>x.raw_summary?.sync_source==="garmin_personal_api_edge_v1"))
+       state.syncImportedOnce=true;
      state.intervalLaps=new Map();
      if(!tagged.error){
        for(const lap of tagged.data||[]){
@@ -725,6 +769,7 @@
        if(b.dataset.runRetry!==undefined){load();return;}
        if(b.dataset.runSyncPreview!==undefined){previewGarminSync();return;}
        if(b.dataset.runSyncOne!==undefined){importOneGarmin();return;}
+       if(b.dataset.runSyncRepair!==undefined){repairImportedGarmin(b.dataset.runSyncRepair);return;}
        if(b.dataset.runNav){state.editor=null;state.view=b.dataset.runNav;render();return;}
        if(b.dataset.runItemAdd){showCatalogEditor(b.dataset.runItemAdd);return;}
        if(b.dataset.runItemEdit){showCatalogEditor(b.dataset.runItemEdit,b.dataset.runItemId);return;}
