@@ -585,6 +585,7 @@
         closed_dates:[...garbageSettings.closed_dates]
       };
       renderGarbageSettings();
+      if($("garbage-status"))$("garbage-status").textContent="現在の収集設定を読み込んだよ。変更したら「収集設定を保存」を押してね。";
     }
   }
   async function loadGarbageSettings(){
