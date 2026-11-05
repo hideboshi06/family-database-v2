@@ -602,8 +602,19 @@ button.notes-link{width:100%;font-weight:650}
 
 
 /* Family-editable waste pickup rules: compact on desktop, readable on iPhone. */
+.garbage-settings{padding:0}
+.garbage-settings-toggle{display:block}
+.garbage-settings-summary{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:15px 14px;font-size:15px;font-weight:750;color:var(--ink);cursor:pointer;
+  list-style:none;min-height:48px}
+.garbage-settings-summary::-webkit-details-marker{display:none}
+.garbage-settings-summary::after{content:"⌄";font-size:20px;font-weight:600;line-height:1;
+  color:var(--sub);transition:transform .16s ease}
+.garbage-settings-toggle[open]>.garbage-settings-summary::after{transform:rotate(180deg)}
+.garbage-settings-summary:focus-visible{outline:2px solid var(--blue);outline-offset:-4px;border-radius:12px}
+.garbage-settings-body{padding:0 14px 15px;border-top:1px solid var(--line)}
 .garbage-settings h3{font-size:14px;margin:17px 0 6px}
-.garbage-settings>.small{line-height:1.65}
+.garbage-settings-body>.small{line-height:1.65}
 .garbage-dates-editor{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;align-items:end;margin:10px 0}
 .garbage-dates-editor .field{min-width:0;margin:0}
 .garbage-dates-editor input{min-width:0;width:100%;font-size:14px;margin-top:5px}
@@ -612,9 +623,8 @@ button.notes-link{width:100%;font-weight:650}
 .garbage-closed-item{display:inline-flex;align-items:center;gap:4px;border:1px solid #c9dae8;background:#eff6fc;color:var(--ink);border-radius:9px;padding:3px 4px 3px 9px;font-size:12px}
 .garbage-remove-date{border:0;background:transparent;color:var(--red);font-size:18px;font-weight:800;line-height:1;min-height:28px;min-width:28px;border-radius:7px}
 .garbage-remove-date:focus-visible{outline:2px solid var(--navy);outline-offset:2px}
-.garbage-rule-details{border-top:1px solid var(--line);padding:13px 0 12px;margin-top:13px}
-.garbage-rule-details summary{cursor:pointer;color:var(--navy);font-weight:750;font-size:13px;line-height:1.5}
-.garbage-rule-details .small{margin:10px 0;line-height:1.6}
+.garbage-rule-section{border-top:1px solid var(--line);padding:2px 0 12px;margin-top:13px}
+.garbage-rule-section .small{margin:10px 0;line-height:1.6}
 .garbage-rule-list{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fafcfe}
 .garbage-rule-row{display:grid;grid-template-columns:51px 104px minmax(0,1fr);gap:9px;align-items:start;padding:10px;border-bottom:1px solid var(--line)}
 .garbage-rule-row:last-child{border:0}
