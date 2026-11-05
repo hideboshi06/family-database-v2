@@ -181,7 +181,7 @@
           state.catalogGenre=itemGenre(item);navigate("catalog");viewCatalogCard(id);
         }
       });
-      window.FamilyRunning?.init({client:state.client});
+      window.FamilyRunning?.init({client:state.client,role:state.role});
       $("settings-admin").hidden=state.role!=="admin";
       $("page-catalog").hidden=state.role!=="admin";
       $("catalog-tab").hidden=state.role!=="admin";
