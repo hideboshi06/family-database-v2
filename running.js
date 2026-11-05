@@ -231,7 +231,8 @@
  const raceList=()=>state.races.map(r=>
    '<div class="run-datarow"><span><strong>'+esc(r.race_name)+'</strong>'+
      '<small>'+esc(r.race_date|| (r.race_month?r.race_month.slice(0,7)+"（日程未定）":"日程未定"))+
-     ' · '+(Number(r.distance_m)/1000).toFixed(2)+' km'+(r.target_time_seconds?' · 目標 '+esc(fmtTime(r.target_time_seconds)):"")+'</small></span>'+
+     ' · '+(Number(r.distance_m)/1000).toFixed(2)+' km'+(r.target_time_seconds?' · 目標 '+esc(fmtTime(r.target_time_seconds)):"")+
+     ' · 紐付け'+state.activities.filter(a=>a.race_id===r.id).length+'件</small></span>'+
    '<div class="run-entry-side"><span class="run-badge">'+esc(statuses[r.registration_status]||r.registration_status)+'</span>'+
    smallbtn("編集",'data-run-item-edit="race" data-run-item-id="'+esc(r.id)+'"')+'</div></div>').join("");
  const races=()=>card(
@@ -568,10 +569,15 @@
  function form(a){
    const typeValues=[["","未分類"],["jog","ジョグ"],["long_run","ロング走"],["pace_run","ペース走"],["tempo_run","テンポ走"],["intervals","インターバル走"],["repetition","レペティション"],["race","レース"],["other","その他"]];
    const shoeVals=[["","未設定"],...state.shoes.map(s=>[s.id,s.shoe_name])];
+   const raceVals=[["","紐付けなし"],...state.races.map(r=>[
+     r.id,(r.race_date||r.race_month?.slice(0,7)||"日付未定")+" · "+r.race_name+
+       "（"+(Number(r.distance_m)/1000).toFixed(2)+"km）"
+   ])];
    const nums=(limit)=>[["","未設定"],...Array.from({length:limit},(_,i)=>[String(i+1),String(i+1)])];
    return '<form id="run-edit-form" class="run-edit-fields">'+
      field("run-training","練習種別",'<select name="training_type">'+options(typeValues,a.training_type)+'</select>')+
      field("run-shoe","シューズ",'<select name="shoe_id">'+options(shoeVals,a.shoe_id)+'</select>')+
+     field("run-race","大会（先に「大会」タブで登録）",'<select name="race_id">'+options(raceVals,a.race_id)+'</select>')+
      field("run-rpe","きつさ（RPE）",'<select name="rpe">'+options(nums(10),a.rpe)+'</select>')+
      field("run-fatigue","疲労感",'<select name="fatigue">'+options(nums(5),a.fatigue)+'</select>')+
      field("run-pain","違和感・痛み",'<input name="pain_note" maxlength="500" value="'+esc(a.pain_note||"")+'" placeholder="任意">')+
@@ -581,9 +587,11 @@
 
  function detailMeta(a){
    const shoe=state.shoes.find(s=>s.id===a.shoe_id)?.shoe_name||null;
+   const race=state.races.find(r=>r.id===a.race_id)||null;
    const lines=[];
    const row=(k,v)=>'<div class="run-datarow"><span>'+esc(k)+'</span><strong>'+esc(v)+'</strong></div>';
    if(a.training_type)lines.push(row("練習種別",label(a.training_type)));
+   if(race)lines.push(row("大会",race.race_name+"（"+(race.race_date||race.race_month?.slice(0,7)||"日程未定")+"）"));
    if(shoe)lines.push(row("シューズ",shoe));
    if(a.rpe!=null)lines.push(row("きつさ（RPE）",a.rpe+"/10"));
    if(a.fatigue!=null)lines.push(row("疲労感",a.fatigue+"/5"));
@@ -863,8 +871,19 @@
  async function save(form){
    const a=state.selected;if(!a)return;
    const fd=new FormData(form),s=name=>String(fd.get(name)||"").trim();
-   const payload={training_type:s("training_type")||null,shoe_id:s("shoe_id")||null,rpe:s("rpe")?Number(s("rpe")):null,fatigue:s("fatigue")?Number(s("fatigue")):null,pain_note:s("pain_note")||null,memo:s("memo")||null};
-   const status=$("#run-edit-status"),button=form.querySelector('button[type="submit"]');button.disabled=true;status.textContent="保存中…";
+   const raceId=s("race_id")||null;
+   const status=$("#run-edit-status"),button=form.querySelector('button[type="submit"]');
+   const linkedRace=raceId?state.races.find(r=>r.id===raceId):null;
+   if(raceId&&!linkedRace){status.textContent="指定した大会が見つからないよ。大会一覧を再読み込みしてね。";return;}
+   // Prevent the run from accidentally linking to a race held on another day.
+   if(linkedRace?.race_date&&linkedRace.race_date!==activityDate(a)){
+     status.textContent="ランの日付と大会の開催日が一致していないよ。選択した大会を確認してね。";
+     return;
+   }
+   const payload={training_type:s("training_type")||null,shoe_id:s("shoe_id")||null,
+     race_id:raceId,rpe:s("rpe")?Number(s("rpe")):null,
+     fatigue:s("fatigue")?Number(s("fatigue")):null,pain_note:s("pain_note")||null,memo:s("memo")||null};
+   button.disabled=true;status.textContent="保存中…";
    try{
      const {data,error}=await state.client.from("running_activities").update(payload).eq("id",a.id).select("id").single();if(error)throw error;
      if(!data)throw Error("変更を確認できなかったよ。");
