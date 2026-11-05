@@ -2,7 +2,7 @@
 "use strict";
 (function(){
  const root=()=>document.getElementById("running-root");
- const state={client:null,ready:false,loading:false,loaded:false,role:"member",syncLoading:false,syncDialogOpen:false,syncMessage:"",syncCandidate:null,syncImportedOnce:false,activities:[],shoes:[],races:[],view:"home",returnView:"home",selected:null,laps:[],points:[],axis:"time",lapPage:0,intervalLaps:new Map(),editing:false,editor:null,month:"",error:""};
+ const state={client:null,ready:false,loading:false,loaded:false,role:"member",syncLoading:false,syncDialogOpen:false,syncMessage:"",syncCandidates:[],syncTotal:0,syncProcessed:0,syncImported:0,syncSkipped:0,syncRunning:false,syncStopRequested:false,activities:[],shoes:[],races:[],view:"home",returnView:"home",selected:null,laps:[],points:[],axis:"time",lapPage:0,intervalLaps:new Map(),editing:false,editor:null,month:"",error:""};
  const kinds={jog:"ジョグ",easy:"ジョグ",long_run:"ロング走",pace_run:"ペース走",tempo_run:"テンポ走",intervals:"インターバル走",interval:"インターバル走",repetition:"レペティション",race:"レース",other:"その他"};
  const segments={warmup:"アップ",work:"疾走",recovery:"回復",cooldown:"ダウン",steady:"一定走",unknown:"未分類"};
  const esc=x=>String(x==null?"":x).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -301,32 +301,42 @@
  }
  function garminSyncModal(){
    if(!state.syncDialogOpen||state.view!=="home")return "";
+   const total=state.syncCandidates.length;
    const checkButton=smallbtn(state.syncLoading?"確認中…":"もう一度確認",
-      'data-run-sync-preview="1"'+(state.syncLoading?' disabled aria-busy="true"':""));
+     'data-run-sync-preview="1"'+(state.syncLoading?' disabled aria-busy="true"':""));
    const repairTarget=state.activities.find(a=>
      a.raw_summary?.sync_source==="garmin_personal_api_edge_v1" &&
      !Array.isArray(a.raw_summary?.hr_zones_seconds) &&
-     /^\d{6,20}$/.test(String(a.garmin_activity_id||""))
+     /^\\d{6,20}$/.test(String(a.garmin_activity_id||""))
    );
-   const repairButton=repairTarget?
-     '<button type="button" class="btn secondary smallbtn" data-run-sync-repair="'+esc(repairTarget.garmin_activity_id)+'"'+
-       (state.syncLoading?' disabled aria-busy="true"':"")+'>心拍ゾーン・ピッチを再計算</button>':"";
-   const importButton=state.syncCandidate&&!state.syncImportedOnce?
-     '<button type="button" class="btn smallbtn" data-run-sync-one="1"'+
-       (state.syncLoading?' disabled aria-busy="true"':"")+'>1件だけ取り込む</button>':"";
-   const candidate=state.syncCandidate&&!state.syncImportedOnce?
-     '<p class="run-sync-target">対象：'+esc(state.syncCandidate.title||"Garminランニング")+
-     '（'+esc(state.syncCandidate.startedAt?fdate(state.syncCandidate.startedAt):"日時不明")+'）</p>':"";
+   const repairButton=!state.syncLoading && repairTarget?
+     '<button type="button" class="btn secondary smallbtn" data-run-sync-repair="'+esc(repairTarget.garmin_activity_id)+'">過去の取り込みを修復</button>':"";
+   const importButton=total && !state.syncLoading?
+     '<button type="button" class="btn smallbtn" data-run-sync-all="1">'+total+'件を取り込む</button>':"";
+   const stopButton=state.syncRunning?
+     '<button type="button" class="btn secondary smallbtn" data-run-sync-stop="1"'+
+       (state.syncStopRequested?' disabled':"")+'>'+(state.syncStopRequested?"中断中…":"この後中断")+'</button>':"";
+   const progress=state.syncTotal>0?
+     '<div class="run-sync-progress" role="group" aria-label="取り込み進捗">'+
+       '<div class="run-sync-progress-top"><span>取り込み状況</span><strong>'+
+         state.syncProcessed+' / '+state.syncTotal+'件</strong></div>'+
+       '<div class="run-sync-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="'+
+         state.syncTotal+'" aria-valuenow="'+state.syncProcessed+'"><div style="width:'+
+         Math.round(state.syncProcessed/state.syncTotal*100)+'%"></div></div></div>':"";
    return '<div class="run-sync-overlay" data-run-sync-overlay="1">'+
      '<div id="run-garmin-dialog" class="run-sync-dialog" role="dialog" aria-modal="true" aria-labelledby="run-sync-dialog-title">'+
        '<div class="run-sync-dialog-heading"><h3 id="run-sync-dialog-title">Garmin Connect</h3>'+
-       '<button type="button" class="run-sync-close" data-run-sync-close="1" aria-label="閉じる">×</button></div>'+
-       '<p class="small" role="status" aria-live="polite">'+esc(state.syncMessage||"Garmin Connectから新しいランを確認するよ。確認だけでは記録は変更しないよ。")+'</p>'+
-       candidate+
-       '<div class="run-sync-dialog-actions">'+checkButton+repairButton+importButton+'</div>'+
+       '<button type="button" class="run-sync-close" data-run-sync-close="1" aria-label="閉じる"'+
+         (state.syncRunning?' disabled title="取り込み中は中断してから閉じてね"':"")+'>×</button></div>'+
+       '<p class="small" role="status" aria-live="polite">'+esc(state.syncMessage||
+         "Garmin Connectの新しいランを確認するよ。確認だけでは記録は変更しないよ。")+'</p>'+
+       progress+
+       '<div class="run-sync-dialog-actions">'+checkButton+repairButton+importButton+stopButton+'</div>'+
+       '<p class="small run-sync-footnote">直近365日を確認。登録済みのランは上書きせず、1件ずつ安全に取り込むよ。</p>'+
      '</div></div>';
  }
  function closeGarminSync(){
+   if(state.syncRunning)return;
    state.syncDialogOpen=false;
    render();
    root()?.querySelector('[data-run-sync-open]')?.focus();
@@ -334,10 +344,10 @@
  function openGarminSync(){
    if(state.role!=="admin"||state.syncDialogOpen)return;
    state.syncDialogOpen=true;
-   state.syncMessage="Garmin Connectの更新を確認するよ。確認だけでは記録は変更しないよ。";
-   state.syncCandidate=null;
+   state.syncMessage="Garmin Connectに新しいランがないか確認するよ。";
+   state.syncCandidates=[];
+   state.syncTotal=0;state.syncProcessed=0;state.syncImported=0;state.syncSkipped=0;
    render();
-   root()?.querySelector('[data-run-sync-close]')?.focus();
    previewGarminSync();
  }
  function render(){
@@ -345,77 +355,100 @@
    if(state.loading&&!state.loaded){el.innerHTML=card('<p class="small">ランニング記録を読み込み中…</p>');return;}
    if(state.error){el.innerHTML=error(state.error);return;}
    if(state.view==="detail"){renderDetail();return;}
+   const active=document.activeElement;
+   const focusAttribute=state.syncDialogOpen&&active&&el.contains(active)?
+     [...active.attributes].find(attr=>attr.name.startsWith("data-run-sync-"))?.name:null;
    el.innerHTML=nav()+(state.view==="home"?home():state.view==="history"?history():state.view==="shoes"?shoes():races())+
      garminSyncModal();
-   if(state.syncDialogOpen)el.querySelector('[data-run-sync-close]')?.focus();
+   if(state.syncDialogOpen){
+     const target=focusAttribute?el.querySelector('['+focusAttribute+']'):null;
+     (target&&!target.disabled?target:el.querySelector('[data-run-sync-close]:not([disabled])')||
+       el.querySelector('[data-run-sync-stop]'))?.focus({preventScroll:true});
+   }
  }
  async function previewGarminSync(){
-   if(state.role!=="admin"||state.syncLoading||!state.client)return;
+   if(state.role!=="admin"||state.syncLoading||!state.client||!state.syncDialogOpen)return;
    state.syncLoading=true;
-   state.syncMessage="Garmin Connectに新しいランがあるか確認中…";
+   state.syncCandidates=[];
+   state.syncTotal=0;state.syncProcessed=0;state.syncImported=0;state.syncSkipped=0;
+   state.syncMessage="Garmin Connectの更新を確認中…";
    render();
    try{
      const {data,error:invokeError}=await state.client.functions.invoke("garmin-sync",{body:{action:"preview"}});
-     if(invokeError)throw invokeError;
-     if(!data?.ok)throw new Error(data?.error||"確認結果を取得できなかったよ。");
-     const pending=Number(data.pending);
-     if(!Number.isInteger(pending)||pending<0)throw new Error("確認結果の形式が不正だよ。");
-     const first=Array.isArray(data.next)?data.next[0]:null;
-     state.syncCandidate=pending>0&&first&&/^\d{6,20}$/.test(String(first.garminId||""))
-       ? {garminId:String(first.garminId),title:String(first.title||""),startedAt:first.startedAt||null}
-       : null;
-     state.syncMessage=pending===0?
-       "新しいランは見つからなかったよ（直近14日間の確認）。":
-       "新しいランが"+pending+"件見つかったよ。"+(state.syncImportedOnce?"今回のテスト取り込みは完了済みだよ。":"最新の1件だけ試せるよ。");
-   }catch(e){
-     console.warn("Garmin preview failed:",e);
-     state.syncCandidate=null;
-     state.syncMessage="更新確認に失敗したよ。少し時間をおいて、もう一度試してね。";
-   }finally{
-     state.syncLoading=false;
-     render();
-   }
- }
- async function importOneGarmin(){
-   if(state.role!=="admin"||state.syncLoading||state.syncImportedOnce||!state.syncCandidate||!state.client)return;
-   const chosen={...state.syncCandidate};
-   const prompt="Garmin Connectから次のランを1件だけ取り込むよ。\n\n"+
-     (chosen.title||"Garminランニング")+"\n"+
-     (chosen.startedAt?fdate(chosen.startedAt):"日時不明")+
-     "\n\n既存のランは上書きしないよ。取り込んでもいい？";
-   if(!window.confirm(prompt))return;
-   state.syncLoading=true;
-   state.syncMessage="Garminから1件だけ取得・解析しているよ…";
-   render();
-   try{
-     const {data,error:invokeError}=await state.client.functions.invoke("garmin-sync",{
-       body:{action:"sync-one",garminActivityId:chosen.garminId}
-     });
      if(invokeError){
        let reason="";
        try{reason=String((await invokeError.context?.json())?.error||"");}catch{}
        throw new Error(reason||invokeError.message);
      }
-     if(!data?.ok)throw new Error(String(data?.error||"取り込み結果が確認できなかったよ。"));
-     if(Number(data.imported)!==1){
-       state.syncCandidate=null;
-       state.syncMessage="このランはすでに登録済みのようだよ。もう一度『更新を確認』を押してね。";
-       return;
-     }
-     if(String(data.activityId)!==chosen.garminId)throw new Error("保存したGarmin IDが一致しないよ。");
-     state.syncImportedOnce=true;
-     state.syncCandidate=null;
-     state.syncMessage="1件の取り込みが完了したよ！ "+esc(data.title||chosen.title||"ランニング")+
-       "（"+(Number(data.distanceM)/1000).toFixed(2)+" km）"+
-       "。心拍ゾーンの詳しい集計は次の段階で対応するよ。";
-     await load();
+     if(!data?.ok)throw new Error(data?.error||"確認結果が取得できなかったよ。");
+     const pending=Number(data.pending),items=Array.isArray(data.next)?data.next:[];
+     if(!Number.isInteger(pending)||pending<0||pending!==items.length||
+       !items.every(item=>/^\\d{6,20}$/.test(String(item.garminId||""))))
+       throw new Error("確認結果の形式が不正だよ。");
+     state.syncCandidates=items.map(item=>({
+       garminId:String(item.garminId),title:String(item.title||""),startedAt:item.startedAt||null
+     }));
+     state.syncMessage=pending===0?"新しいランはないよ。すべて取り込み済みだね！":
+       "未取り込みのランが"+pending+"件見つかったよ。";
+     if(Number(data.unfinished)>0)state.syncMessage+=" 中断された前回の記録も含まれるよ。";
    }catch(e){
-     console.warn("Garmin import failed:",e);
-     state.syncMessage="1件の取り込みでエラーが出たよ："+(e?.message||"詳細不明")+
-       "。二重登録を避けるため、再実行する前に『更新を確認』してね。";
-     state.syncCandidate=null;
+     console.warn("Garmin preview failed:",e);
+     state.syncCandidates=[];
+     state.syncMessage="更新を確認できなかったよ（"+(e?.message||"通信エラー")+"）。時間をおいて再確認してね。";
    }finally{
      state.syncLoading=false;
+     render();
+   }
+ }
+ async function syncAllGarmin(){
+   if(state.role!=="admin"||state.syncLoading||!state.client||!state.syncDialogOpen||
+      !state.syncCandidates.length)return;
+   const batch=state.syncCandidates.slice();
+   state.syncLoading=true;state.syncRunning=true;state.syncStopRequested=false;
+   state.syncTotal=batch.length;state.syncProcessed=0;state.syncImported=0;state.syncSkipped=0;
+   let failed=null;
+   render();
+   try{
+     for(const item of batch){
+       if(state.syncStopRequested)break;
+       state.syncMessage="Garminのランを取り込み中… "+state.syncProcessed+" / "+state.syncTotal+"件";
+       render();
+       try{
+         const {data,error:invokeError}=await state.client.functions.invoke("garmin-sync",{
+           body:{action:"sync-one",garminActivityId:item.garminId}
+         });
+         if(invokeError){
+           let reason="";
+           try{reason=String((await invokeError.context?.json())?.error||"");}catch{}
+           throw new Error(reason||invokeError.message);
+         }
+         if(!data?.ok || String(data.activityId)!==item.garminId)
+           throw new Error(data?.error||"保存結果の照合に失敗したよ。");
+         if(Number(data.imported)===1)state.syncImported++;
+         else if(Number(data.skipped)===1)state.syncSkipped++;
+         else throw new Error("保存件数が確認できなかったよ。");
+         state.syncProcessed++;
+       }catch(error){failed=error;break;}
+       render();
+     }
+   }finally{
+     state.syncRunning=false;
+     state.syncCandidates=[];
+     const imported=state.syncImported, skipped=state.syncSkipped,processed=state.syncProcessed,total=state.syncTotal;
+     if(failed){
+       console.warn("Garmin sync stopped:",failed);
+       state.syncMessage=imported+"件取り込んだところで停止したよ（"+(failed?.message||"通信エラー")+
+         "）。残りは『もう一度確認』から再開できるよ。";
+     }else if(state.syncStopRequested){
+       state.syncMessage="取り込みを中断したよ。"+imported+"件保存済み、"+(total-processed)+
+         "件は未処理。『もう一度確認』から再開できるよ。";
+     }else{
+       state.syncMessage="取り込み完了！ "+imported+"件を保存"+
+         (skipped?"、登録済み"+skipped+"件をスキップ":"")+"したよ。";
+     }
+     try{if(processed>0)await load();}catch(e){console.warn("Reload after sync failed:",e);}
+     state.syncLoading=false;
+     state.syncStopRequested=false;
      render();
    }
  }
@@ -464,8 +497,6 @@
        state.client.from("running_laps").select("activity_id,lap_index,distance_m,segment_type").in("segment_type",["work","recovery"]).order("lap_index").limit(1000)
      ]);
      state.activities=checked(a);state.shoes=checked(s);state.races=checked(r);
-     if(state.activities.some(x=>x.raw_summary?.sync_source==="garmin_personal_api_edge_v1"))
-       state.syncImportedOnce=true;
      state.intervalLaps=new Map();
      if(!tagged.error){
        for(const lap of tagged.data||[]){
@@ -825,9 +856,10 @@
        if(b.dataset.runBack!==undefined){state.view=state.returnView||"history";state.selected=null;render();return;}
        if(b.dataset.runRetry!==undefined){load();return;}
        if(b.dataset.runSyncPreview!==undefined){previewGarminSync();return;}
-       if(b.dataset.runSyncOne!==undefined){importOneGarmin();return;}
+       if(b.dataset.runSyncAll!==undefined){syncAllGarmin();return;}
+       if(b.dataset.runSyncStop!==undefined){state.syncStopRequested=true;state.syncMessage="現在の1件が終わったら中断するよ。";render();return;}
        if(b.dataset.runSyncRepair!==undefined){repairImportedGarmin(b.dataset.runSyncRepair);return;}
-       if(b.dataset.runNav){state.editor=null;state.syncDialogOpen=false;state.view=b.dataset.runNav;render();return;}
+       if(b.dataset.runNav){if(state.syncRunning)return;state.editor=null;state.syncDialogOpen=false;state.view=b.dataset.runNav;render();return;}
        if(b.dataset.runItemAdd){showCatalogEditor(b.dataset.runItemAdd);return;}
        if(b.dataset.runItemEdit){showCatalogEditor(b.dataset.runItemEdit,b.dataset.runItemId);return;}
        if(b.dataset.runEditorCancel!==undefined){state.editor=null;render();return;}
