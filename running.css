@@ -126,3 +126,21 @@
 .running-page .run-intensity-z4{background:#fff0df;color:#ae6118}
 .running-page .run-intensity-z5{background:#ffebed;color:#b43447}
 @media(max-width:390px){.running-page .run-training-title strong{font-size:12px}.running-page .run-intensity{font-size:9px;padding:3px 6px}}
+
+
+/* One-time shoe and race registration. Mobile first, with optional details hidden. */
+.running-page .run-entry-side{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex:0 0 auto;min-width:86px}
+.running-page .run-entry-side strong{font-size:12px;font-variant-numeric:tabular-nums}
+.running-page .run-entry-form{border-top:1px solid var(--line);margin-top:16px;padding-top:14px;display:grid;grid-template-columns:1fr;gap:11px}
+.running-page .run-entry-form h3{font-size:15px;margin:0 0 2px;font-weight:800}
+.running-page .run-entry-field{display:block;min-width:0}
+.running-page .run-entry-field>span{display:block;color:var(--sub);font-size:11px;font-weight:700;margin-bottom:5px}
+.running-page .run-entry-field input,.running-page .run-entry-field select{display:block;box-sizing:border-box;width:100%;min-height:42px;padding:9px 10px;border:1px solid #cbd8e2;border-radius:9px;background:#fff;color:var(--ink);font:inherit}
+.running-page .run-entry-details{border:1px solid #edf2f6;background:#f8fafc;padding:10px 11px;border-radius:10px}
+.running-page .run-entry-details summary{cursor:pointer;font-size:12px;font-weight:700;color:var(--navy)}
+.running-page .run-entry-details-grid{display:grid;grid-template-columns:1fr;gap:11px;margin-top:12px}
+.running-page .run-entry-actions{display:flex;gap:9px;align-items:center}
+.running-page .run-entry-status{color:var(--sub);font-size:11px;min-height:14px;margin:0}
+@media(min-width:660px){.running-page .run-entry-form{grid-template-columns:repeat(2,minmax(0,1fr))}
+.running-page .run-entry-form h3,.running-page .run-entry-details,.running-page .run-entry-actions,.running-page .run-entry-status{grid-column:1/-1}
+.running-page .run-entry-details-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}

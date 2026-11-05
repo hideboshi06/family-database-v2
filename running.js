@@ -2,7 +2,7 @@
 "use strict";
 (function(){
  const root=()=>document.getElementById("running-root");
- const state={client:null,ready:false,loading:false,loaded:false,activities:[],shoes:[],races:[],view:"home",returnView:"home",selected:null,laps:[],points:[],axis:"time",lapPage:0,intervalLaps:new Map(),editing:false,month:"",error:""};
+ const state={client:null,ready:false,loading:false,loaded:false,activities:[],shoes:[],races:[],view:"home",returnView:"home",selected:null,laps:[],points:[],axis:"time",lapPage:0,intervalLaps:new Map(),editing:false,editor:null,month:"",error:""};
  const kinds={jog:"ジョグ",easy:"ジョグ",long_run:"ロング走",pace_run:"ペース走",tempo_run:"テンポ走",intervals:"インターバル走",interval:"インターバル走",repetition:"レペティション",race:"レース",other:"その他"};
  const segments={warmup:"アップ",work:"疾走",recovery:"回復",cooldown:"ダウン",steady:"一定走",unknown:"未分類"};
  const esc=x=>String(x==null?"":x).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -143,11 +143,136 @@
    card(titlebar("最近のランニング",smallbtn("すべて見る ›",'data-run-nav="history"'))+(state.activities.length?state.activities.slice(0,5).map(renderRow).join(""):empty("Garminの記録はまだ登録されていないよ。")));
  };
  const history=()=>card(titlebar("練習履歴",'<span class="small">'+state.activities.length+'件</span>')+(state.activities.length?state.activities.map(renderRow).join(""):empty("記録がまだないよ。")));
- const shoes=()=>card(titlebar("シューズ管理")+(state.shoes.length?state.shoes.map(s=>{
-   const records=state.activities.filter(a=>a.shoe_id===s.id),d=sum(records,a=>a.distance_m)+(finite(s.baseline_distance_m)?n(s.baseline_distance_m):0);
-   return '<div class="run-datarow"><span>👟 <strong>'+esc(s.shoe_name)+'</strong><small>'+records.length+'回使用</small></span><strong>'+(d/1000).toFixed(1)+' km</strong></div>';
- }).join(""):empty("シューズはまだ登録されていないよ。Garminのギア情報を追加したら、ここに累計距離を表示するよ。")));
- const races=()=>card(titlebar("大会管理")+(state.races.length?state.races.map(r=>'<div class="run-datarow"><span><strong>'+esc(r.race_name)+'</strong><small>'+esc(r.race_date||r.race_month||"日程未定")+' · '+(n(r.distance_m)/1000).toFixed(2)+' km</small></span><span class="run-badge">'+esc(r.registration_status||"")+"</span></div>").join(""):empty("大会データはまだ登録されていないよ。2027年3月のハーフマラソンを目標に準備中。")));
+
+ // Shoe and race master data are entered once, not after every run.
+ // Each form writes through the authenticated Supabase client and existing RLS.
+ const formInput=(name,title,type,value="",extra="")=>
+   '<label class="run-entry-field"><span>'+esc(title)+'</span><input type="'+type+'" name="'+name+'" value="'+esc(value==null?"":value)+'" '+extra+'></label>';
+ const formSelect=(name,title,values,current)=>
+   '<label class="run-entry-field"><span>'+esc(title)+'</span><select name="'+name+'">'+options(values,current)+'</select></label>';
+ const submitActions=()=>'<div class="run-entry-actions"><button type="submit" class="btn">保存する</button>'+
+   smallbtn("キャンセル",'data-run-editor-cancel="1"')+'</div><p class="run-entry-status" role="status"></p>';
+ const shoeForm=()=>{
+   const id=state.editor?.kind==="shoe"?state.editor.id:null;
+   const s=state.shoes.find(x=>x.id===id)||{};
+   const baseline=s.baseline_distance_m==null?"":(Number(s.baseline_distance_m)/1000).toFixed(1);
+   return '<form id="run-shoe-form" class="run-entry-form"><h3>'+(id?"シューズを編集":"シューズを登録")+'</h3>'+
+      formInput("shoe_name","シューズ名","text",s.shoe_name||"",'required maxlength="160" placeholder="例：ジョグ用シューズ"')+
+      formInput("baseline_km","登録前の走行距離（km）","number",baseline,'min="0" step="0.1" inputmode="decimal" placeholder="未使用なら0"')+
+      '<details class="run-entry-details"><summary>任意の詳細（メーカー・モデルなど）</summary><div class="run-entry-details-grid">'+
+       formInput("brand","メーカー","text",s.brand||"",'maxlength="100" placeholder="例：ASICS"')+
+       formInput("model","モデル","text",s.model||"",'maxlength="160"')+
+       formInput("started_on","使用開始日","date",s.started_on||"","")+
+       formInput("retired_on","使用終了日","date",s.retired_on||"","")+
+       formInput("garmin_gear_id","GarminギアID","text",s.garmin_gear_id||"",'maxlength="160"')+
+      '</div></details>'+
+      submitActions()+'</form>';
+ };
+ const raceForm=()=>{
+   const id=state.editor?.kind==="race"?state.editor.id:null;
+   const r=state.races.find(x=>x.id===id)||{};
+   const month=r.race_month?r.race_month.slice(0,7):(r.race_date?r.race_date.slice(0,7):"");
+   const km=r.distance_m==null?21.0975:Number(r.distance_m)/1000;
+   return '<form id="run-race-form" class="run-entry-form"><h3>'+(id?"大会情報を編集":"大会を登録")+'</h3>'+
+      formInput("race_name","大会名","text",r.race_name||"",'required maxlength="200" placeholder="未定なら「2027年3月 ハーフ（仮）」など"')+
+      formInput("race_month","開催予定月","month",month,"")+
+      formInput("race_date","開催日（決まったら）","date",r.race_date||"","")+
+      formInput("distance_km","距離（km）","number",km,'required min="0.001" step="0.0001" inputmode="decimal"')+
+      formSelect("registration_status","状況",[
+        ["considering","検討中"],["registered","エントリー済み"],["completed","出走済み"],["cancelled","中止・見送り"]
+      ],r.registration_status||"considering")+
+      '<details class="run-entry-details"><summary>任意の詳細（目標タイム・優先度など）</summary><div class="run-entry-details-grid">'+
+       formInput("target_time","目標タイム（時:分:秒）","text",r.target_time_seconds?fmtTime(r.target_time_seconds):"",'placeholder="例：2:00:00" inputmode="numeric"')+
+       formSelect("priority","優先度",[["","未設定"],["A","A（本命）"],["B","B"],["C","C"]],r.priority||"")+
+       formInput("location","開催場所","text",r.location||"",'maxlength="200"')+
+       formInput("official_url","大会のURL","url",r.official_url||"",'placeholder="https://"')+
+       '</div></details>'+
+      submitActions()+'</form>';
+ };
+ const shoeList=()=>state.shoes.map(s=>{
+    const records=state.activities.filter(a=>a.shoe_id===s.id);
+    const d=sum(records,a=>a.distance_m)+(finite(s.baseline_distance_m)?n(s.baseline_distance_m):0);
+    return '<div class="run-datarow"><span>👟 <strong>'+esc(s.shoe_name)+'</strong><small>'+
+       (s.brand?esc(s.brand)+" ":"")+(s.model?esc(s.model)+" · ":"")+records.length+'回の記録を紐付け済み</small></span>'+
+       '<div class="run-entry-side"><strong>'+(d/1000).toFixed(1)+' km</strong>'+
+       smallbtn("編集",'data-run-item-edit="shoe" data-run-item-id="'+esc(s.id)+'"')+'</div></div>';
+ }).join("");
+ const shoes=()=>card(
+    titlebar("シューズ管理",smallbtn("+ シューズを追加",'data-run-item-add="shoe"'))+
+    (state.shoes.length?shoeList():empty("まだシューズは登録されていないよ。まず名前だけでも登録できるよ。"))+
+    (state.editor?.kind==="shoe"?shoeForm():""));
+ const statuses={considering:"検討中",registered:"エントリー済み",completed:"出走済み",cancelled:"見送り"};
+ const raceList=()=>state.races.map(r=>
+   '<div class="run-datarow"><span><strong>'+esc(r.race_name)+'</strong>'+
+     '<small>'+esc(r.race_date|| (r.race_month?r.race_month.slice(0,7)+"（日程未定）":"日程未定"))+
+     ' · '+(Number(r.distance_m)/1000).toFixed(2)+' km'+(r.target_time_seconds?' · 目標 '+esc(fmtTime(r.target_time_seconds)):"")+'</small></span>'+
+   '<div class="run-entry-side"><span class="run-badge">'+esc(statuses[r.registration_status]||r.registration_status)+'</span>'+
+   smallbtn("編集",'data-run-item-edit="race" data-run-item-id="'+esc(r.id)+'"')+'</div></div>').join("");
+ const races=()=>card(
+    titlebar("大会管理",smallbtn("+ 大会を追加",'data-run-item-add="race"'))+
+    (state.races.length?raceList():empty("まだ大会は未登録。日程が決まっていなくても、予定月だけ登録できるよ。"))+
+    (state.editor?.kind==="race"?raceForm():""));
+ function showCatalogEditor(kind,id=null){
+    if(!["shoe","race"].includes(kind))return;
+    if(id&&!(kind==="shoe"?state.shoes:state.races).some(x=>x.id===id))return;
+    state.editor={kind,id};state.view=kind==="shoe"?"shoes":"races";
+    render();
+    root()?.querySelector(".run-entry-form")?.scrollIntoView({behavior:"smooth",block:"nearest"});
+ }
+ function parseRaceTime(s){
+    if(!s)return null;
+    const parts=s.split(":");
+    if(parts.length!==2&&parts.length!==3)throw Error("目標タイムは「1:55:00」の形式で入力してね。");
+    if(!parts.every(x=>/^\d{1,3}$/.test(x)))throw Error("目標タイムの形式を確認してね。");
+    const values=parts.map(Number);
+    const h=parts.length===3?values[0]:0;
+    const m=parts.length===3?values[1]:values[0];
+    const sec=values[values.length-1];
+    if((parts.length===3&&m>=60)||sec>=60||h*3600+m*60+sec<=0)throw Error("目標タイムを確認してね。");
+    return h*3600+m*60+sec;
+ }
+ async function saveCatalog(form,kind){
+    const fd=new FormData(form),val=k=>String(fd.get(k)||"").trim();
+    const id=state.editor?.kind===kind?state.editor.id:null;
+    const button=form.querySelector('button[type="submit"]'),status=form.querySelector(".run-entry-status");
+    if(!button||!status)return;
+    let payload,table;
+    try{
+       if(kind==="shoe"){
+          table="running_shoes";
+          const name=val("shoe_name");
+          if(!name)throw Error("シューズ名を入力してね。");
+          const km=val("baseline_km");
+          if(km!==""&&(!Number.isFinite(Number(km))||Number(km)<0))throw Error("走行距離は0以上で入力してね。");
+          const start=val("started_on")||null,end=val("retired_on")||null;
+          if(start&&end&&end<start)throw Error("終了日は使用開始日以降にしてね。");
+          payload={shoe_name:name,baseline_distance_m:km!==""?Number(km)*1000:null,
+             brand:val("brand")||null,model:val("model")||null,started_on:start,retired_on:end,
+             garmin_gear_id:val("garmin_gear_id")||null};
+       }else{
+          table="running_races";
+          const name=val("race_name"),km=Number(val("distance_km"));
+          if(!name)throw Error("大会名を入力してね。");
+          if(!Number.isFinite(km)||km<=0)throw Error("大会の距離を入力してね。");
+          const date=val("race_date")||null,month=date?date.slice(0,7):val("race_month");
+          if(month&&!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))throw Error("開催予定月を確認してね。");
+          payload={race_name:name,race_month:month?month+"-01":null,race_date:date,distance_m:km*1000,
+             registration_status:val("registration_status")||"considering",
+             target_time_seconds:parseRaceTime(val("target_time")),priority:val("priority")||null,
+             location:val("location")||null,official_url:val("official_url")||null};
+       }
+       button.disabled=true;status.textContent="保存中…";
+       const write=id?
+          state.client.from(table).update(payload).eq("id",id).select("id").single():
+          state.client.from(table).insert(payload).select("id").single();
+       const res=await write;if(res.error)throw res.error;
+       if(!res.data?.id)throw Error("保存を確認できなかったよ。");
+       state.editor=null;await load();
+    }catch(e){
+       status.textContent="保存できなかったよ: "+(e.message||String(e));
+       button.disabled=false;
+    }
+ }
  function render(){
   const el=root();if(!el)return;
   if(state.loading&&!state.loaded){el.innerHTML=card('<p class="small">ランニング記録を読み込み中…</p>');return;}
@@ -161,8 +286,8 @@
    try{
      const [a,s,r,tagged]=await Promise.all([
        state.client.from("running_activities").select("id,garmin_activity_id,started_at,title,activity_type,distance_m,moving_time_seconds,elapsed_time_seconds,avg_heart_rate_bpm,max_heart_rate_bpm,avg_cadence_spm,training_type,shoe_id,race_id,rpe,fatigue,pain_note,memo,raw_summary").order("started_at",{ascending:false}).limit(1000),
-       state.client.from("running_shoes").select("id,shoe_name,baseline_distance_m,retired_on").order("shoe_name"),
-       state.client.from("running_races").select("id,race_name,race_date,race_month,distance_m,registration_status,target_time_seconds").order("race_date",{ascending:true,nullsFirst:false}),
+       state.client.from("running_shoes").select("id,shoe_name,brand,model,garmin_gear_id,started_on,retired_on,baseline_distance_m").order("shoe_name"),
+       state.client.from("running_races").select("id,race_name,race_date,race_month,distance_m,location,official_url,registration_status,priority,target_time_seconds").order("race_date",{ascending:true,nullsFirst:false}),
        state.client.from("running_laps").select("activity_id,lap_index,distance_m,segment_type").in("segment_type",["work","recovery"]).order("lap_index").limit(1000)
      ]);
      state.activities=checked(a);state.shoes=checked(s);state.races=checked(r);
@@ -510,7 +635,10 @@
        const b=e.target.closest("button,[data-run-point]");if(!b)return;
        if(b.dataset.runBack!==undefined){state.view=state.returnView||"history";state.selected=null;render();return;}
        if(b.dataset.runRetry!==undefined){load();return;}
-       if(b.dataset.runNav){state.view=b.dataset.runNav;render();return;}
+       if(b.dataset.runNav){state.editor=null;state.view=b.dataset.runNav;render();return;}
+       if(b.dataset.runItemAdd){showCatalogEditor(b.dataset.runItemAdd);return;}
+       if(b.dataset.runItemEdit){showCatalogEditor(b.dataset.runItemEdit,b.dataset.runItemId);return;}
+       if(b.dataset.runEditorCancel!==undefined){state.editor=null;render();return;}
        if(b.dataset.runOpen){open(b.dataset.runOpen);return;}
        if(b.dataset.runMonth){state.month=changeMonth(state.month,Number(b.dataset.runMonth));render();return;}
        if(b.dataset.runAxis){state.axis=b.dataset.runAxis;state.lapPage=0;renderGraph();root().querySelectorAll("[data-run-axis]").forEach(x=>{x.classList.toggle("active",x.dataset.runAxis===state.axis);x.setAttribute("aria-selected",x.dataset.runAxis===state.axis?"true":"false");});return;}
@@ -533,7 +661,11 @@
          out.hidden=false;
        }
      });
-     root().addEventListener("submit",e=>{if(e.target.id==="run-edit-form"){e.preventDefault();save(e.target);}});
+     root().addEventListener("submit",e=>{
+       if(e.target.id==="run-edit-form"){e.preventDefault();save(e.target);}
+       else if(e.target.id==="run-shoe-form"){e.preventDefault();saveCatalog(e.target,"shoe");}
+       else if(e.target.id==="run-race-form"){e.preventDefault();saveCatalog(e.target,"race");}
+     });
    }
  }
  window.FamilyRunning={init,load};
