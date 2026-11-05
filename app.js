@@ -30,32 +30,44 @@
   };
   const dateAdd=(day,n)=>{let d=new Date(day+"T12:00:00Z");d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);};
   const weekday=day=>new Date(day+"T12:00:00Z").getUTCDay();
-  // Weekly collection rules from the family's schedule. Alternate weeks are anchored
-  // to Oct 21-23, 2026: Wed cardboard / Thu newspapers / Fri non-burnables.
-  // Special dates can override the entire day's pickup: [] means no collection.
-  // e.g. "YYYY-MM-DD": [], "YYYY-MM-DD": ["臨時収集品目"].
-  const garbageExceptions={
-    "2026-12-31":[], "2027-01-01":[], "2027-01-02":[], "2027-01-03":[]
+  // Shared editable weekly schedule; week A starts Monday 2026-10-19.
+  // Persisted to garbage_schedule_settings, including exceptional no-collection dates.
+  const defaultGarbageRules={
+    "0":{cycle:"off",a:"",b:""},
+    "1":{cycle:"weekly",a:"燃える",b:""},
+    "2":{cycle:"weekly",a:"プラ",b:""},
+    "3":{cycle:"biweekly",a:"段ボール ビン 有害",b:"紙 ビン 有害"},
+    "4":{cycle:"biweekly",a:"新聞 燃える",b:"古布 燃える"},
+    "5":{cycle:"biweekly",a:"燃えない ペットボトル",b:"缶 ペットボトル"},
+    "6":{cycle:"off",a:"",b:""}
+  };
+  const copyGarbageRules=value=>JSON.parse(JSON.stringify(value));
+  let garbageSettings={
+    rules:copyGarbageRules(defaultGarbageRules),
+    closed_dates:["2026-12-31","2027-01-01","2027-01-02","2027-01-03"],updated_at:null
+  };
+  let garbageDraft=null,garbageDirty=false,garbageSaving=false;
+  const validGarbageDate=value=>{
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(String(value||"")))return false;
+    const d=new Date(value+"T12:00:00Z");
+    return !Number.isNaN(d.getTime())&&d.toISOString().slice(0,10)===value;
   };
   function garbageForDay(day){
-    if(Object.prototype.hasOwnProperty.call(garbageExceptions,day))
-      return [...garbageExceptions[day]];
-    const alternate=Math.floor(
-      (Date.parse(day+"T12:00:00Z")-Date.parse("2026-10-21T12:00:00Z"))/(7*86400000)
-    )%2===0;
-    switch(weekday(day)){
-      case 1:return ["燃える"];
-      case 2:return ["プラ"];
-      case 3:return [alternate?"段ボール ビン 有害":"紙 ビン 有害"];
-      case 4:return [alternate?"新聞 燃える":"古布 燃える"];
-      case 5:return [alternate?"燃えない ペットボトル":"缶 ペットボトル"];
-      default:return [];
-    }
+    if(garbageSettings.closed_dates.includes(day))return [];
+    const dow=weekday(day),rule=garbageSettings.rules?.[String(dow)];
+    if(!rule)return [];
+    const monday=dateAdd(day,-((dow+6)%7));
+    const weeks=Math.round(
+      (Date.parse(monday+"T12:00:00Z")-Date.parse("2026-10-19T12:00:00Z"))/(7*86400000)
+    );
+    const weekA=weeks%2===0;
+    const value=rule.cycle==="weekly"?rule.a:
+      rule.cycle==="biweekly"?(weekA?rule.a:rule.b):"";
+    return typeof value==="string"&&value.trim()?[value.trim()]:[];
   }
   function garbageDisplayForDay(day){
     const planned=garbageForDay(day);
-    return planned.length?planned:
-      Object.prototype.hasOwnProperty.call(garbageExceptions,day)?["年末年始は収集なし"]:[];
+    return planned.length?planned:garbageSettings.closed_dates.includes(day)?["収集なし"]:[];
   }
   const fmtDay=day=>Number(day.slice(5,7))+"/"+Number(day.slice(8))+"("+["日","月","火","水","木","金","土"][weekday(day)]+")";
   // Japan Cabinet Office holidays for 2026-2027, including substitute and bridge holidays.
@@ -120,6 +132,10 @@
     if(page==="notes")window.FamilyNotes?.load();
     if(page==="running")window.FamilyRunning?.load();
     if(page==="settings"){
+      loadGarbageSettings().catch(e=>{
+        $("garbage-status").textContent="収集設定を読み込めなかったよ: "+errorText(e);
+        report(e,"ゴミ収集設定: ");
+      });
       refreshPushDeviceStatus().catch(e=>report(e,"受信端末: "));
       loadMembers().catch(e=>report(e,"メンバー読込: "));
       if(state.role==="admin")loadNotificationSettings().catch(e=>{
@@ -434,13 +450,15 @@
   }
   async function refresh(){
     $("page-status").textContent="データを読み込み中…";
-    const [d,c,s,t,catalog]=await Promise.all([
+    const [d,c,s,t,catalog,garbage]=await Promise.all([
       state.client.from("daily").select("*").gte("day",isoToday()).lte("day",dateAdd(isoToday(),8)).order("day"),
       state.client.from("cleaning").select("*").order("id"),
       state.client.from("shopping").select("*").eq("shopping_list",true).order("sort_order",{ascending:true,nullsFirst:false}),
       state.client.from("tasks").select("*").order("created_at",{ascending:true}),
-      state.role==="admin"?state.client.from("shopping").select("*").order("product"):Promise.resolve(null)
+      state.role==="admin"?state.client.from("shopping").select("*").order("product"):Promise.resolve(null),
+      state.client.from("garbage_schedule_settings").select("rules,closed_dates,updated_at").eq("id",1).single()
     ]);
+    applyGarbageSettings(check(garbage));
     state.daily=check(d);state.cleaning=check(c);state.shopping=check(s);state.tasks=check(t);
     state.catalog=state.role==="admin"?check(catalog):[];
     renderDashboard();renderTodo();
@@ -543,6 +561,135 @@
     if(!name)return "";
     if(name.endsWith("掃除"))return name;
     return name.replace(/(拭き|ふき)$/u,"")+"掃除";
+  }
+
+  function applyGarbageSettings(row){
+    if(!row||!row.rules||typeof row.rules!=="object"||!Array.isArray(row.closed_dates))
+      throw Error("ゴミ収集設定が正しく読み込めなかったよ");
+    const normalized=copyGarbageRules(defaultGarbageRules);
+    for(const [dow,rule] of Object.entries(row.rules)){
+      if(!Object.prototype.hasOwnProperty.call(normalized,dow)||!rule||typeof rule!=="object")continue;
+      if(!["off","weekly","biweekly"].includes(rule.cycle))continue;
+      normalized[dow]={
+        cycle:rule.cycle,a:String(rule.a||"").slice(0,80),b:String(rule.b||"").slice(0,80)
+      };
+    }
+    garbageSettings={
+      rules:normalized,
+      closed_dates:[...new Set(row.closed_dates.filter(validGarbageDate))].sort(),
+      updated_at:row.updated_at||null
+    };
+    if(!garbageDirty){
+      garbageDraft={
+        rules:copyGarbageRules(garbageSettings.rules),
+        closed_dates:[...garbageSettings.closed_dates]
+      };
+      renderGarbageSettings();
+    }
+  }
+  async function loadGarbageSettings(){
+    const row=check(await state.client.from("garbage_schedule_settings")
+      .select("rules,closed_dates,updated_at").eq("id",1).single());
+    if(!garbageDirty)applyGarbageSettings(row);
+    if(state.tab==="dashboard")renderDashboard();
+  }
+  function garbageRuleEditor(){
+    const days=[[1,"月"],[2,"火"],[3,"水"],[4,"木"],[5,"金"],[6,"土"],[0,"日"]];
+    const cycles=[["off","収集なし"],["weekly","毎週"],["biweekly","隔週"]];
+    $("garbage-rule-list").innerHTML=days.map(([dow,label])=>{
+      const value=garbageDraft.rules[String(dow)]||{cycle:"off",a:"",b:""};
+      const options=cycles.map(([cycle,name])=>
+        '<option value="'+cycle+'"'+(value.cycle===cycle?" selected":"")+'>'+name+'</option>').join("");
+      const input=(field,hint)=>
+        '<label class="garbage-rule-input">'+hint+
+        '<input class="input" type="text" maxlength="80" data-garbage-field="'+field+'" data-dow="'+dow+'" value="'+esc(value[field]||"")+'" placeholder="短い収集名"></label>';
+      return '<div class="garbage-rule-row"><span class="garbage-weekday">'+label+'曜日</span>'+
+        '<select class="input garbage-cycle" data-garbage-cycle data-dow="'+dow+'" aria-label="'+label+'曜日の収集周期">'+options+'</select>'+
+        '<div class="garbage-rule-values">'+(value.cycle==="weekly"?input("a","収集内容"):
+          value.cycle==="biweekly"?input("a","A週")+input("b","B週"):"")+'</div></div>';
+    }).join("");
+  }
+  function garbageClosedEditor(){
+    const list=$("garbage-closed-list");
+    list.innerHTML=garbageDraft.closed_dates.length?garbageDraft.closed_dates.map(day=>
+      '<span class="garbage-closed-item">'+esc(day)+'<button type="button" class="garbage-remove-date" '+
+      'data-action="garbage-remove-date" data-day="'+esc(day)+'" aria-label="'+esc(day)+'の収集休止日を削除">×</button></span>'
+    ).join(""):'<span class="small">登録なし（通常の曜日ルールで収集）</span>';
+  }
+  function garbageSaveHint(){
+    const save=$("garbage-save");
+    if(!save)return;
+    save.disabled=!garbageDirty||garbageSaving;
+    save.textContent=garbageSaving?"保存中…":"収集設定を保存";
+    if(garbageDirty)$("garbage-status").textContent="変更はまだ保存されていないよ。";
+  }
+  function renderGarbageSettings(){
+    if(!garbageDraft||!$("garbage-rule-list"))return;
+    garbageRuleEditor();garbageClosedEditor();garbageSaveHint();
+  }
+  function captureGarbageRuleInputs(){
+    if(!garbageDraft)return;
+    document.querySelectorAll("[data-garbage-cycle]").forEach(el=>{
+      const row=garbageDraft.rules[el.dataset.dow];
+      if(row)row.cycle=el.value;
+    });
+    document.querySelectorAll("input[data-garbage-field]").forEach(el=>{
+      const row=garbageDraft.rules[el.dataset.dow];
+      if(row)row[el.dataset.garbageField]=el.value;
+    });
+  }
+  function markGarbageDirty(){
+    garbageDirty=true;garbageSaveHint();
+  }
+  function addGarbageClosedDates(){
+    if(!garbageDraft||garbageSaving)return;
+    captureGarbageRuleInputs();
+    const first=$("garbage-close-from").value,last=$("garbage-close-to").value||first;
+    if(!validGarbageDate(first)||!validGarbageDate(last)||last<first){
+      $("garbage-status").textContent="収集休止日の開始日・終了日を確認してね。";return;
+    }
+    const days=Math.round((Date.parse(last+"T12:00:00Z")-Date.parse(first+"T12:00:00Z"))/86400000)+1;
+    if(days>45){$("garbage-status").textContent="一度に登録できるのは45日までだよ。";return;}
+    const all=new Set(garbageDraft.closed_dates);
+    for(let n=0;n<days;n++)all.add(dateAdd(first,n));
+    if(all.size>120){$("garbage-status").textContent="休止日は最大120日まで登録できるよ。";return;}
+    garbageDraft.closed_dates=[...all].sort();
+    $("garbage-close-from").value="";$("garbage-close-to").value="";
+    garbageClosedEditor();markGarbageDirty();
+  }
+  function removeGarbageClosedDate(day){
+    if(!garbageDraft||garbageSaving)return;
+    captureGarbageRuleInputs();
+    garbageDraft.closed_dates=garbageDraft.closed_dates.filter(x=>x!==day);
+    garbageClosedEditor();markGarbageDirty();
+  }
+  async function saveGarbageSettings(){
+    if(!garbageDraft||garbageSaving||!garbageDirty)return;
+    captureGarbageRuleInputs();
+    const rules=copyGarbageRules(garbageDraft.rules);
+    for(const row of Object.values(rules)){
+      if(!["off","weekly","biweekly"].includes(row.cycle))throw Error("収集周期を選んでね。");
+      row.a=String(row.a||"").trim().replace(/\s+/g," ");
+      row.b=String(row.b||"").trim().replace(/\s+/g," ");
+      if(row.a.length>80||row.b.length>80)throw Error("収集名は80文字以内にしてね。");
+      if(row.cycle==="weekly"&&!row.a)throw Error("「毎週」の収集名を入力してね。");
+      if(row.cycle==="biweekly"&&(!row.a||!row.b))throw Error("「隔週」はA週とB週の両方を入力してね。");
+    }
+    garbageSaving=true;garbageSaveHint();
+    const status=$("garbage-status");
+    try{
+      const saved=check(await state.client.from("garbage_schedule_settings")
+        .update({rules,closed_dates:garbageDraft.closed_dates,updated_at:new Date().toISOString()})
+        .eq("id",1).select("rules,closed_dates,updated_at").single());
+      garbageDirty=false;
+      applyGarbageSettings(saved);
+      renderDashboard();
+      status.textContent="保存したよ！今日・明日の表示と、毎朝の通知にも反映されるよ。";
+      toast("ゴミ収集設定を保存したよ！");
+    }catch(e){
+      status.textContent="保存できなかったよ: "+errorText(e);
+      report(e,"ゴミ収集設定: ");
+    }finally{garbageSaving=false;garbageSaveHint();}
   }
   function dueCleaningToday(today){
     return state.cleaning
@@ -1293,6 +1440,9 @@
       if(a==="register-push-device")await registerPushDevice();
       if(a==="remove-push-device")await removePushDevice();
       if(a==="toggle-push-auto")await toggleAutomaticPush();
+      if(a==="garbage-add-dates")addGarbageClosedDates();
+      if(a==="garbage-remove-date")removeGarbageClosedDate(el.dataset.day);
+      if(a==="garbage-save")await saveGarbageSettings();
       if(a==="save-modal"){
         const form=$("modal-form");
         if(!form)throw Error("入力画面が見つかりません");
@@ -1332,6 +1482,9 @@
   }
   function change(e){
     const el=e.target;
+    if(el.matches("[data-garbage-cycle]")){
+      captureGarbageRuleInputs();garbageRuleEditor();markGarbageDirty();
+    }
     if(el.matches('input[data-action="catalog-photo-select"]')){
       prepareSelectedCatalogPhoto(el).catch(e=>report(e,"画像準備: "));
     }
@@ -1361,7 +1514,10 @@
     if(el.matches('input[data-action="todo-bought"]'))completeShopping(el);
     if(el.matches('input[data-action="todo-cleaned"]'))completeCleaning(el);
   }
-  function input(e){if(e.target.matches("textarea[data-month-field],input[data-month-field]"))updateDraft(e.target);}
+  function input(e){
+    if(e.target.matches("input[data-garbage-field]")){captureGarbageRuleInputs();markGarbageDirty();}
+    if(e.target.matches("textarea[data-month-field],input[data-month-field]"))updateDraft(e.target);
+  }
   async function submit(e){
     const form=e.target;if(!["modal-form","member-form","catalog-quick-form"].includes(form.id))return;
     e.preventDefault();
