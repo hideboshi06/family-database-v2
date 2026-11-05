@@ -30,6 +30,27 @@
   };
   const dateAdd=(day,n)=>{let d=new Date(day+"T12:00:00Z");d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);};
   const weekday=day=>new Date(day+"T12:00:00Z").getUTCDay();
+  // Weekly collection rules from the family's schedule. Alternate weeks are anchored
+  // to Oct 21-23, 2026: Wed cardboard / Thu newspapers / Fri non-burnables.
+  // Special dates can override the entire day's pickup: [] means no collection.
+  // e.g. "YYYY-MM-DD": [], "YYYY-MM-DD": ["臨時収集品目"].
+  const garbageExceptions={};
+  function garbageForDay(day){
+    if(Object.prototype.hasOwnProperty.call(garbageExceptions,day))
+      return [...garbageExceptions[day]];
+    const alternate=Math.floor(
+      (Date.parse(day+"T12:00:00Z")-Date.parse("2026-10-21T12:00:00Z"))/(7*86400000)
+    )%2===0;
+    switch(weekday(day)){
+      case 1:return ["燃やせるごみ"];
+      case 2:return ["プラスチック"];
+      case 3:return ["びん","有害ごみ（小型充電式電池等）","せん定枝","スプレー缶",
+        alternate?"段ボール・茶色紙":"雑誌・本・雑がみ・牛乳等紙パック"];
+      case 4:return ["燃やせるごみ",alternate?"新聞・折込チラシ":"古布"];
+      case 5:return ["ペットボトル",alternate?"燃やせないごみ":"缶"];
+      default:return [];
+    }
+  }
   const fmtDay=day=>Number(day.slice(5,7))+"/"+Number(day.slice(8))+"("+["日","月","火","水","木","金","土"][weekday(day)]+")";
   // Japan Cabinet Office holidays for 2026-2027, including substitute and bridge holidays.
   // Update the year-specific table after the government announces subsequent dates.
@@ -500,9 +521,11 @@
   }
   function agendaDetails(day,row,compact=false){
     const lines=filledAgendaFields(row).map(k=>line(person[k],row[k],row[agendaUrlField(k)])).join("");
+    const garbage=garbageForDay(day);
+    const garbageLine=garbage.length?line("ゴミ",garbage.join("、")):"";
     return '<div class="dayrow'+(compact?' dayrow-inline':'')+'">'+
       (compact?"":'<button type="button" data-action="edit-day" data-day="'+day+'" class="daydate '+weekend(day)+'">'+fmtDay(day)+(holidayName(day)?' <span class="holiday-name">'+esc(holidayName(day))+'</span>':"")+'</button>')+
-      '<div class="daycontent">'+(lines||'<div class="empty">予定なし</div>')+'</div></div>';
+      '<div class="daycontent">'+(lines||'<div class="empty">予定なし</div>')+garbageLine+'</div></div>';
   }
   // Today/tomorrow use the same two-column person labels as the future agenda.
   // No outer "予定" row, so entries line up with lunch and garbage.
@@ -569,7 +592,7 @@
     $("weather-summary").innerHTML='<div class="weather-summary"><strong>朝</strong> '+weatherPart(now.morning_weather,now.morning_temp_c,now.morning_rain_pct)+' <span class="muted">／</span> <strong>夕</strong> '+weatherPart(now.evening_weather,now.evening_temp_c,now.evening_rain_pct)+'</div>';
     renderDailyAgenda("today-schedule",now);
     showOptional("today-lunch",now.lunch);
-    setScheduleTodo("today-garbage",garbageScheduleLines(now.garbage));
+    setScheduleTodo("today-garbage",garbageForDay(today));
     setScheduleTodo("today-cleaning",dueCleaningToday(today));
     setScheduleTodo("today-task",dueTasksToday(today));
     setScheduleTodo("today-shopping",shoppingToday());
@@ -580,7 +603,7 @@
       ' <span class="muted">／</span> <span class="tomorrow-forecast"><strong>夕</strong> '+weatherPart(next.evening_weather,next.evening_temp_c,next.evening_rain_pct)+'</span>';
     renderDailyAgenda("tomorrow-schedule",next);
     showOptional("tomorrow-lunch",next.lunch);
-    showOptional("tomorrow-garbage",next.garbage);
+    showOptional("tomorrow-garbage",garbageForDay(tomorrow).join("\n"));
 
     // Always show all seven days from the day after tomorrow, including days without plans.
     const upcoming=Array.from({length:7},(_,i)=>dateAdd(today,i+2));
@@ -1034,8 +1057,12 @@
     const entries=arr.map(day=>{
       const changed=state.draft.has(day),opened=state.opened.has(day);
       const preview=f.map(k=>monthValue(day,k)).filter(Boolean).map(x=>String(x).replace(/\s+/g," ").slice(0,20)).join(" / ");
-      return '<div class="monthday'+(changed?" dirty":"")+'"><button type="button" class="monthtop" data-action="expand-day" data-day="'+day+'"><span class="monthdate '+weekend(day)+'">'+fmtDay(day)+(holidayName(day)?'<span class="holiday-name month-holiday">'+esc(holidayName(day))+'</span>':"")+(changed?'<span class="changedmark">変更</span>':"")+'</span><span class="monthpreview">'+esc(preview||"未入力")+'</span><span class="tiny">'+(opened?"▲":"▼")+'</span></button>'+
-        (opened?'<div class="monthfields">'+f.map(k=>'<label class="field">'+person[k]+'</label><textarea data-month-field="'+k+'" data-day="'+day+'" rows="'+(k==="lunch"?5:2)+'" placeholder="'+person[k]+'を入力・貼り付け">'+esc(monthValue(day,k))+'</textarea>').join("")+
+      const garbage=state.mode==="schedule"?garbageForDay(day):[];
+      const briefGarbage=garbage.length?"🗑 "+garbage[0]+(garbage.length>1?" ほか"+(garbage.length-1)+"種":""):"";
+      const garbageDetails=garbage.length?'<div class="month-garbage-info"><strong>🗑 ゴミ出し</strong>'+
+        '<div class="month-garbage-lines">'+garbage.map(x=>'<span>'+esc(x)+'</span>').join("")+'</div></div>':"";
+      return '<div class="monthday'+(changed?" dirty":"")+'"><button type="button" class="monthtop" data-action="expand-day" data-day="'+day+'"><span class="monthdate '+weekend(day)+'">'+fmtDay(day)+(holidayName(day)?'<span class="holiday-name month-holiday">'+esc(holidayName(day))+'</span>':"")+(changed?'<span class="changedmark">変更</span>':"")+'</span><span class="monthpreview">'+esc([preview,briefGarbage].filter(Boolean).join(" / ")||"未入力")+'</span><span class="tiny">'+(opened?"▲":"▼")+'</span></button>'+
+        (opened?'<div class="monthfields">'+garbageDetails+f.map(k=>'<label class="field">'+person[k]+'</label><textarea data-month-field="'+k+'" data-day="'+day+'" rows="'+(k==="lunch"?5:2)+'" placeholder="'+person[k]+'を入力・貼り付け">'+esc(monthValue(day,k))+'</textarea>').join("")+
           (state.mode==="schedule"?agendaUrlEditor(key=>monthValue(day,key),day):"")+'</div>':"")+'</div>';
     });
     // On wide screens: 1–15 on the left, 16–the month's last day on the right.
