@@ -9,7 +9,7 @@
 <link rel="manifest" href="./manifest.webmanifest">
 <meta name="description" content="Family Database v2 — 家族の予定・給食・掃除・買い物・家族ノート">
 <title>Family Database</title>
-<link rel="stylesheet" href="./styles.css?v=20261105-garbage-short-today">
+<link rel="stylesheet" href="./styles.css?v=20261105-garbage-editor">
 <link rel="stylesheet" href="./running.css?v=20261105-hr-zones">
 </head>
 <body>
@@ -245,6 +245,29 @@
         <p id="settings-user" style="overflow-wrap:anywhere"></p>
         <p class="notice">閲覧・編集権限はGoogleログインとSupabaseのアクセス制限（RLS）で管理しています。</p>
       </section>
+      <section class="card garbage-settings" id="settings-garbage">
+        <h2>🗑 ゴミ収集設定</h2>
+        <p class="small">曜日ごとの収集予定を自動計算して、ホーム画面の「今日・明日」と毎朝の通知に表示するよ。家族の端末で共通の設定だよ。</p>
+        <h3>収集がない日</h3>
+        <p class="small">年末年始など、収集を休止する日を登録できるよ。期間指定も可能だよ。</p>
+        <div class="garbage-dates-editor">
+          <label class="field" for="garbage-close-from">開始日
+            <input class="input" type="date" id="garbage-close-from">
+          </label>
+          <label class="field" for="garbage-close-to">終了日（1日なら空欄）
+            <input class="input" type="date" id="garbage-close-to">
+          </label>
+          <button type="button" class="btn secondary smallbtn" data-action="garbage-add-dates">休止日を追加</button>
+        </div>
+        <div class="garbage-closed-list" id="garbage-closed-list" aria-label="登録された収集休止日"></div>
+        <details class="garbage-rule-details">
+          <summary>曜日・周期・収集内容を確認・編集</summary>
+          <p class="small">「隔週」のA週は2026年10月19日（月）からの週、B週はその翌週。以後、毎週交互に切り替わるよ。</p>
+          <div id="garbage-rule-list" class="garbage-rule-list"></div>
+        </details>
+        <button type="button" class="btn full" id="garbage-save" data-action="garbage-save" disabled>収集設定を保存</button>
+        <p class="small" id="garbage-status" role="status" aria-live="polite">収集設定を読み込み中…</p>
+      </section>
       <section class="card" id="settings-notifications">
         <h2>🔔 通知設定</h2>
         <p class="small">毎朝、Supabaseに登録した今日の家族予定をお知らせします。通知をタップするとスケジュールが開きます。</p>
@@ -318,7 +341,7 @@
 <script>window.FD_CONFIG = {url:"https://besevrrmhwmkdqmoiscf.supabase.co",key:"sb_publishable_oo7Bdb8Ip-icb6Y0nqovKg_OH9Taql2"};</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="./running.js?v=20261105-hr-zones" defer></script>
-<script src="./app.js?v=20261105-garbage-short-today" defer></script>
+<script src="./app.js?v=20261105-garbage-editor" defer></script>
 <script src="./notes.js?v=20261015-notes-mobile-ui" defer></script>
 </body>
 </html>
