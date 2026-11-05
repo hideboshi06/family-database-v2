@@ -599,3 +599,9 @@ button.notes-link{width:100%;font-weight:650}
 .shopping-notify-panel .tiny{margin:7px 0 0;color:var(--sub)}
 #shopping-notify-status:empty{display:none}
 #shopping-notify-status{margin:9px 0 0;line-height:1.5;overflow-wrap:anywhere}
+
+/* Automatically calculated garbage collections inside expanded monthly schedule. */
+.month-garbage-info{margin:0 0 13px;padding:10px 12px;border:1px solid #d3e4ee;
+  border-radius:10px;background:#eff7fd;overflow-wrap:anywhere}
+.month-garbage-info strong{font-size:12px;color:#2d6595;display:block;margin-bottom:5px}
+.month-garbage-lines{display:grid;gap:3px;font-size:12px;line-height:1.6}
