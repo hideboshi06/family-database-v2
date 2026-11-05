@@ -2,7 +2,7 @@
 "use strict";
 (function(){
  const root=()=>document.getElementById("running-root");
- const state={client:null,ready:false,loading:false,loaded:false,activities:[],shoes:[],races:[],view:"home",returnView:"home",selected:null,laps:[],points:[],axis:"time",lapPage:0,intervalLaps:new Map(),editing:false,editor:null,month:"",error:""};
+ const state={client:null,ready:false,loading:false,loaded:false,role:"member",syncLoading:false,syncMessage:"",activities:[],shoes:[],races:[],view:"home",returnView:"home",selected:null,laps:[],points:[],axis:"time",lapPage:0,intervalLaps:new Map(),editing:false,editor:null,month:"",error:""};
  const kinds={jog:"ジョグ",easy:"ジョグ",long_run:"ロング走",pace_run:"ペース走",tempo_run:"テンポ走",intervals:"インターバル走",interval:"インターバル走",repetition:"レペティション",race:"レース",other:"その他"};
  const segments={warmup:"アップ",work:"疾走",recovery:"回復",cooldown:"ダウン",steady:"一定走",unknown:"未分類"};
  const esc=x=>String(x==null?"":x).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -137,7 +137,12 @@
    const arr=monthly();
    const current=state.races.filter(x=>x.registration_status!=="cancelled" && (x.race_date||x.race_month)>=dateKey(new Date().toISOString())).sort((a,b)=>(a.race_date||a.race_month).localeCompare(b.race_date||b.race_month))[0];
    const goal=current?'<strong>'+esc(current.race_name)+'</strong><p class="small">'+esc(current.race_date||current.race_month||"日程未定")+' · '+(n(current.distance_m)/1000).toFixed(2)+' km</p>':'<strong>2027年3月 ハーフマラソン</strong><p class="small">大会名・日程は未登録</p>';
-   return card('<div class="run-race-info"><span class="run-race-icon">🏅</span><div><div class="small">NEXT TARGET</div>'+goal+'</div></div>','run-race-card')+
+   const syncCard=state.role==="admin"?card(
+     titlebar("Garmin Connect",smallbtn(state.syncLoading?"確認中…":"更新を確認",'data-run-sync-preview="1"'+(state.syncLoading?' disabled aria-busy="true"':"")))+
+     '<p class="small" role="status">'+esc(state.syncMessage||"新しいランがあるか確認するよ。確認だけなので記録は変更しないよ。")+'</p>',
+     "run-sync-card"
+   ):"";
+   return syncCard+card('<div class="run-race-info"><span class="run-race-icon">🏅</span><div><div class="small">NEXT TARGET</div>'+goal+'</div></div>','run-race-card')+
    card('<div class="run-heading"><h2>'+yearMonth(state.month)+'の記録</h2><div class="run-month-controls">'+smallbtn("‹",'data-run-month="-1"')+smallbtn("›",'data-run-month="1"')+'</div></div>'+metrics(arr))+
    card(titlebar("週間走行距離（月〜日）")+weeklyGraph(state.month,state.activities))+
    card(titlebar("最近のランニング",smallbtn("すべて見る ›",'data-run-nav="history"'))+(state.activities.length?state.activities.slice(0,5).map(renderRow).join(""):empty("Garminの記録はまだ登録されていないよ。")));
@@ -279,6 +284,28 @@
   if(state.error){el.innerHTML=error(state.error);return;}
   if(state.view==="detail"){renderDetail();return;}
   el.innerHTML=nav()+(state.view==="home"?home():state.view==="history"?history():state.view==="shoes"?shoes():races());
+ }
+ async function previewGarminSync(){
+   if(state.role!=="admin"||state.syncLoading||!state.client)return;
+   state.syncLoading=true;
+   state.syncMessage="Garmin Connectに新しいランがあるか確認中…";
+   render();
+   try{
+     const {data,error:invokeError}=await state.client.functions.invoke("garmin-sync",{body:{action:"preview"}});
+     if(invokeError)throw invokeError;
+     if(!data?.ok)throw new Error(data?.error||"確認結果を取得できなかったよ。");
+     const pending=Number(data.pending);
+     if(!Number.isInteger(pending)||pending<0)throw new Error("確認結果の形式が不正だよ。");
+     state.syncMessage=pending===0?
+       "新しいランは見つからなかったよ（直近14日間の確認）。":
+       "新しいランが"+pending+"件見つかったよ！まだ取り込んでいないよ。";
+   }catch(e){
+     console.warn("Garmin preview failed:",e);
+     state.syncMessage="更新確認に失敗したよ。少し時間をおいて、もう一度試してね。";
+   }finally{
+     state.syncLoading=false;
+     render();
+   }
  }
  async function load(){
    if(!state.ready||state.loading)return;
@@ -626,15 +653,16 @@
      Object.assign(a,payload);state.editing=false;renderDetail();
    }catch(e){status.textContent="保存できなかったよ: "+(e.message||e);button.disabled=false;}
  }
- function init({client}={}){
+ function init({client,role}={}){
    if(!client||!root())return;
-   state.client=client;state.month=currentMonth();
+   state.client=client;state.role=role==="admin"?"admin":"member";state.month=currentMonth();
    if(!state.ready){
      state.ready=true;
      root().addEventListener("click",e=>{
        const b=e.target.closest("button,[data-run-point]");if(!b)return;
        if(b.dataset.runBack!==undefined){state.view=state.returnView||"history";state.selected=null;render();return;}
        if(b.dataset.runRetry!==undefined){load();return;}
+       if(b.dataset.runSyncPreview!==undefined){previewGarminSync();return;}
        if(b.dataset.runNav){state.editor=null;state.view=b.dataset.runNav;render();return;}
        if(b.dataset.runItemAdd){showCatalogEditor(b.dataset.runItemAdd);return;}
        if(b.dataset.runItemEdit){showCatalogEditor(b.dataset.runItemEdit,b.dataset.runItemId);return;}
