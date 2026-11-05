@@ -2,7 +2,7 @@
 "use strict";
 (function(){
  const root=()=>document.getElementById("running-root");
- const state={client:null,ready:false,loading:false,loaded:false,role:"member",syncLoading:false,syncMessage:"",activities:[],shoes:[],races:[],view:"home",returnView:"home",selected:null,laps:[],points:[],axis:"time",lapPage:0,intervalLaps:new Map(),editing:false,editor:null,month:"",error:""};
+ const state={client:null,ready:false,loading:false,loaded:false,role:"member",syncLoading:false,syncMessage:"",syncCandidate:null,syncImportedOnce:false,activities:[],shoes:[],races:[],view:"home",returnView:"home",selected:null,laps:[],points:[],axis:"time",lapPage:0,intervalLaps:new Map(),editing:false,editor:null,month:"",error:""};
  const kinds={jog:"ジョグ",easy:"ジョグ",long_run:"ロング走",pace_run:"ペース走",tempo_run:"テンポ走",intervals:"インターバル走",interval:"インターバル走",repetition:"レペティション",race:"レース",other:"その他"};
  const segments={warmup:"アップ",work:"疾走",recovery:"回復",cooldown:"ダウン",steady:"一定走",unknown:"未分類"};
  const esc=x=>String(x==null?"":x).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -275,14 +275,21 @@
  }
  function garminSyncCard(){
    const canCheck=state.role==="admin";
-   const action=canCheck
-     ? smallbtn(state.syncLoading?"確認中…":"更新を確認",'data-run-sync-preview="1"'+(state.syncLoading?' disabled aria-busy="true"':""))
-     : "";
+   const checkButton=canCheck?
+     smallbtn(state.syncLoading?"確認中…":"更新を確認",
+       'data-run-sync-preview="1"'+(state.syncLoading?' disabled aria-busy="true"':"")):"";
+   const importButton=canCheck&&state.syncCandidate&&!state.syncImportedOnce?
+     '<button type="button" class="btn smallbtn" data-run-sync-one="1"'+
+       (state.syncLoading?' disabled aria-busy="true"':"")+'>1件だけ取り込む</button>':"";
    const hint=canCheck
-     ? (state.syncMessage||"新しいランがあるか確認するよ。確認だけなので記録は変更しないよ。")
+     ? (state.syncMessage||"新しいランがあるか確認するよ。最初は確認だけで記録は変更しないよ。")
      : "Garmin更新の確認は管理者アカウントで利用できるよ。";
-   return card(titlebar("Garmin Connect",action)+
-     '<p class="small" role="status">'+esc(hint)+'</p>',"run-sync-card");
+   const candidate=canCheck&&state.syncCandidate&&!state.syncImportedOnce?
+     '<p class="small">取り込み対象：'+esc(state.syncCandidate.title||"Garminランニング")+
+     '（'+esc(state.syncCandidate.startedAt?fdate(state.syncCandidate.startedAt):"日時不明")+'）</p>':"";
+   return card(titlebar("Garmin Connect",checkButton)+
+     '<p class="small" role="status">'+esc(hint)+'</p>'+candidate+
+     (importButton?'<div class="run-entry-actions">'+importButton+'</div>':""),"run-sync-card");
  }
  function render(){
   const el=root();if(!el)return;
@@ -302,12 +309,60 @@
      if(!data?.ok)throw new Error(data?.error||"確認結果を取得できなかったよ。");
      const pending=Number(data.pending);
      if(!Number.isInteger(pending)||pending<0)throw new Error("確認結果の形式が不正だよ。");
+     const first=Array.isArray(data.next)?data.next[0]:null;
+     state.syncCandidate=pending>0&&first&&/^\d{6,20}$/.test(String(first.garminId||""))
+       ? {garminId:String(first.garminId),title:String(first.title||""),startedAt:first.startedAt||null}
+       : null;
      state.syncMessage=pending===0?
        "新しいランは見つからなかったよ（直近14日間の確認）。":
-       "新しいランが"+pending+"件見つかったよ！まだ取り込んでいないよ。";
+       "新しいランが"+pending+"件見つかったよ。"+(state.syncImportedOnce?"今回のテスト取り込みは完了済みだよ。":"最新の1件だけ試せるよ。");
    }catch(e){
      console.warn("Garmin preview failed:",e);
+     state.syncCandidate=null;
      state.syncMessage="更新確認に失敗したよ。少し時間をおいて、もう一度試してね。";
+   }finally{
+     state.syncLoading=false;
+     render();
+   }
+ }
+ async function importOneGarmin(){
+   if(state.role!=="admin"||state.syncLoading||state.syncImportedOnce||!state.syncCandidate||!state.client)return;
+   const chosen={...state.syncCandidate};
+   const prompt="Garmin Connectから次のランを1件だけ取り込むよ。\n\n"+
+     (chosen.title||"Garminランニング")+"\n"+
+     (chosen.startedAt?fdate(chosen.startedAt):"日時不明")+
+     "\n\n既存のランは上書きしないよ。取り込んでもいい？";
+   if(!window.confirm(prompt))return;
+   state.syncLoading=true;
+   state.syncMessage="Garminから1件だけ取得・解析しているよ…";
+   render();
+   try{
+     const {data,error:invokeError}=await state.client.functions.invoke("garmin-sync",{
+       body:{action:"sync-one",garminActivityId:chosen.garminId}
+     });
+     if(invokeError){
+       let reason="";
+       try{reason=String((await invokeError.context?.json())?.error||"");}catch{}
+       throw new Error(reason||invokeError.message);
+     }
+     if(!data?.ok)throw new Error(String(data?.error||"取り込み結果が確認できなかったよ。"));
+     if(Number(data.imported)!==1){
+       state.syncCandidate=null;
+       state.syncMessage="このランはすでに登録済みのようだよ。もう一度『更新を確認』を押してね。";
+       return;
+     }
+     if(String(data.activityId)!==chosen.garminId)throw new Error("保存したGarmin IDが一致しないよ。");
+     state.syncImportedOnce=true;
+     state.syncCandidate=null;
+     state.syncMessage="1件の取り込みが完了したよ！ "+esc(data.title||chosen.title||"ランニング")+
+       "（"+(Number(data.distanceM)/1000).toFixed(2)+" km）"+
+       "。心拍ゾーンの詳しい集計は次の段階で対応するよ。";
+     await load();
+   }catch(e){
+     console.warn("Garmin import failed:",e);
+     state.syncMessage="1件の取り込みでエラーが出たよ："+(e?.message||"詳細不明")+
+       "。二重登録を避けるため、再実行する前に『更新を確認』してね。";
+     state.syncCandidate=null;
    }finally{
      state.syncLoading=false;
      render();
@@ -669,6 +724,7 @@
        if(b.dataset.runBack!==undefined){state.view=state.returnView||"history";state.selected=null;render();return;}
        if(b.dataset.runRetry!==undefined){load();return;}
        if(b.dataset.runSyncPreview!==undefined){previewGarminSync();return;}
+       if(b.dataset.runSyncOne!==undefined){importOneGarmin();return;}
        if(b.dataset.runNav){state.editor=null;state.view=b.dataset.runNav;render();return;}
        if(b.dataset.runItemAdd){showCatalogEditor(b.dataset.runItemAdd);return;}
        if(b.dataset.runItemEdit){showCatalogEditor(b.dataset.runItemEdit,b.dataset.runItemId);return;}
