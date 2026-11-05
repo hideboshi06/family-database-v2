@@ -347,6 +347,7 @@
    if(state.view==="detail"){renderDetail();return;}
    el.innerHTML=nav()+(state.view==="home"?home():state.view==="history"?history():state.view==="shoes"?shoes():races())+
      garminSyncModal();
+   if(state.syncDialogOpen)el.querySelector('[data-run-sync-close]')?.focus();
  }
  async function previewGarminSync(){
    if(state.role!=="admin"||state.syncLoading||!state.client)return;
