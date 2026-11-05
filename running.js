@@ -2,7 +2,7 @@
 "use strict";
 (function(){
  const root=()=>document.getElementById("running-root");
- const state={client:null,ready:false,loading:false,loaded:false,role:"member",syncLoading:false,syncMessage:"",syncCandidate:null,syncImportedOnce:false,activities:[],shoes:[],races:[],view:"home",returnView:"home",selected:null,laps:[],points:[],axis:"time",lapPage:0,intervalLaps:new Map(),editing:false,editor:null,month:"",error:""};
+ const state={client:null,ready:false,loading:false,loaded:false,role:"member",syncLoading:false,syncDialogOpen:false,syncMessage:"",syncCandidate:null,syncImportedOnce:false,activities:[],shoes:[],races:[],view:"home",returnView:"home",selected:null,laps:[],points:[],axis:"time",lapPage:0,intervalLaps:new Map(),editing:false,editor:null,month:"",error:""};
  const kinds={jog:"ジョグ",easy:"ジョグ",long_run:"ロング走",pace_run:"ペース走",tempo_run:"テンポ走",intervals:"インターバル走",interval:"インターバル走",repetition:"レペティション",race:"レース",other:"その他"};
  const segments={warmup:"アップ",work:"疾走",recovery:"回復",cooldown:"ダウン",steady:"一定走",unknown:"未分類"};
  const esc=x=>String(x==null?"":x).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -86,51 +86,74 @@
    else name="ジョグ";
    return time+name;
  }
- const renderRow=a=>'<button class="run-activity" type="button" data-run-open="'+esc(a.id)+'"><span class="run-date">'+esc(activityDate(a).slice(5).replace("-","/"))+'</span><span class="run-activity-mid"><span class="run-training-title"><strong>'+esc(autoRunTitle(a))+'</strong>'+intensityBadge(a)+'</span><small>'+esc(fmtDist(a.distance_m))+' · '+esc(fmtPace(a.moving_time_seconds,a.distance_m))+' · '+(finite(a.avg_heart_rate_bpm)?esc(a.avg_heart_rate_bpm)+" bpm":"心拍なし")+'</small></span><span class="run-right">›</span></button>';
+ const weekNames=["日","月","火","水","木","金","土"];
+ const dayLabel=key=>{
+   const d=new Date(key+"T00:00:00Z");
+   return (d.getUTCMonth()+1)+"/"+d.getUTCDate()+"("+weekNames[d.getUTCDay()]+")";
+ };
+ const renderRow=a=>'<button class="run-activity" type="button" data-run-open="'+esc(a.id)+'"><span class="run-date">'+esc(dayLabel(activityDate(a)))+'</span><span class="run-activity-mid"><span class="run-training-title"><strong>'+esc(autoRunTitle(a))+'</strong>'+intensityBadge(a)+'</span><small>'+esc(fmtDist(a.distance_m))+' · '+esc(fmtPace(a.moving_time_seconds,a.distance_m))+' · '+(finite(a.avg_heart_rate_bpm)?esc(a.avg_heart_rate_bpm)+" bpm":"心拍なし")+'</small></span><span class="run-right">›</span></button>';
+ const recentWeekRows=()=>{
+   const todayKey=dateKey(new Date().toISOString());
+   const todayUTC=Date.parse(todayKey+"T00:00:00Z");
+   const byDate=new Map();
+   for(const run of state.activities){
+     const key=activityDate(run);
+     if(!byDate.has(key))byDate.set(key,[]);
+     byDate.get(key).push(run);
+   }
+   const out=[];
+   for(let ago=0;ago<7;ago++){
+     const key=new Date(todayUTC-ago*86400000).toISOString().slice(0,10);
+     const runs=byDate.get(key)||[];
+     if(runs.length)out.push(...runs.map(renderRow));
+     else out.push('<div class="run-activity run-off-row"><span class="run-date">'+esc(dayLabel(key))+
+       '</span><span class="run-activity-mid"><strong>オフ</strong></span></div>');
+   }
+   return out.join("");
+ };
  const monthly=()=>state.activities.filter(a=>activityDate(a).slice(0,7)===state.month);
  const metrics=arr=>{let km=sum(arr,a=>a.distance_m),time=sum(arr,a=>a.moving_time_seconds);return '<div class="run-metrics">'+
    [["走行距離",km?(km/1000).toFixed(2)+" km":"0 km"],["練習回数",arr.length+"回"],["合計時間",fmtTime(time)],["平均ペース",km>0?fmtPace(time,km):"—"]].map(([l,v])=>'<div class="run-stat"><div>'+l+'</div><strong>'+v+"</strong></div>").join("")+"</div>";};
- // Use real Monday–Sunday calendar weeks in Japan, even when a week crosses
- // the selected month's boundary. The month totals above stay month-only.
- const weeklyGraph=(yearMonth,allActivities)=>{
-   const [year,month]=yearMonth.split("-").map(Number);
+ // Show the current JST week on the right, with the previous four
+ // complete Monday–Sunday weeks to its left; independent of month navigation.
+ const weeklyGraph=allActivities=>{
    const day=86400000;
-   const first=Date.UTC(year,month-1,1);
-   const last=Date.UTC(year,month,0);
+   const currentDate=dateKey(new Date().toISOString());
+   const todayUTC=Date.parse(currentDate+"T00:00:00Z");
    const mondayOffset=d=>(new Date(d).getUTCDay()+6)%7;
-   const firstMonday=first-mondayOffset(first)*day;
-   const lastSunday=last+(6-mondayOffset(last))*day;
+   const thisMonday=todayUTC-mondayOffset(todayUTC)*day;
+   const firstMonday=thisMonday-4*7*day;
    const toDay=d=>new Date(d).toISOString().slice(0,10);
    const label=d=>{const date=new Date(d);return (date.getUTCMonth()+1)+"/"+date.getUTCDate();};
-   const distanceByDay=new Map();
-   const timeByDay=new Map();
+   const distanceByDay=new Map(),timeByDay=new Map();
    for(const activity of allActivities){
      const date=activityDate(activity);
      distanceByDay.set(date,(distanceByDay.get(date)||0)+(finite(activity.distance_m)?n(activity.distance_m):0));
      timeByDay.set(date,(timeByDay.get(date)||0)+(finite(activity.moving_time_seconds)?n(activity.moving_time_seconds):0));
    }
    const weeks=[];
-   for(let monday=firstMonday;monday<=lastSunday;monday+=7*day){
+   for(let index=0;index<5;index++){
+     const monday=firstMonday+index*7*day,sunday=monday+6*day;
      let meters=0,seconds=0;
-     for(let dayIndex=0;dayIndex<7;dayIndex++){
-       const date=toDay(monday+dayIndex*day);
-       meters+=distanceByDay.get(date)||0;
-       seconds+=timeByDay.get(date)||0;
+     for(let d=0;d<7;d++){
+       const key=toDay(monday+d*day);
+       meters+=distanceByDay.get(key)||0;
+       seconds+=timeByDay.get(key)||0;
      }
-     const sunday=monday+6*day;
-     weeks.push({meters,seconds,monday,sunday,
-       firstLabel:label(monday),lastLabel:label(sunday)});
+     weeks.push({meters,seconds,firstLabel:label(monday),lastLabel:label(sunday),current:index===4});
    }
-   const max=Math.max(1000,...weeks.map(x=>x.meters));
-   return '<div class="run-weekly" role="group" aria-label="月曜から日曜までの週間走行距離">'+
+   const max=Math.max(1000,...weeks.map(w=>w.meters));
+   return '<div class="run-weekly" role="group" aria-label="直近5週間の走行距離。今週が一番右">'+
      weeks.map(w=>{
        const km=(w.meters/1000).toFixed(1);
        const height=w.meters?Math.max(4,w.meters/max*100):0;
-       const fullLabel=w.firstLabel+"〜"+w.lastLabel;
-       return '<div class="run-week" title="'+fullLabel+"・"+km+"km・"+fmtTime(w.seconds)+'">'+
+       const range=w.firstLabel+"〜"+w.lastLabel;
+       return '<div class="run-week'+(w.current?' run-week-current':'')+'" title="'+
+         (w.current?'今週・':'')+range+'・'+km+'km・'+fmtTime(w.seconds)+'">'+
          '<span>'+km+'</span>'+
          '<div class="run-week-well"><div class="run-week-bar" style="height:'+height.toFixed(2)+'%"></div></div>'+
-         '<small class="run-week-range"><span>'+w.firstLabel+'</span><span>〜'+w.lastLabel+'</span></small></div>';
+         '<small class="run-week-range"><span>'+w.firstLabel+'</span><span>〜'+w.lastLabel+'</span></small>'+
+         '</div>';
      }).join("")+'</div>';
  };
  const home=()=>{
@@ -139,8 +162,11 @@
    const goal=current?'<strong>'+esc(current.race_name)+'</strong><p class="small">'+esc(current.race_date||current.race_month||"日程未定")+' · '+(n(current.distance_m)/1000).toFixed(2)+' km</p>':'<strong>2027年3月 ハーフマラソン</strong><p class="small">大会名・日程は未登録</p>';
    return card('<div class="run-race-info"><span class="run-race-icon">🏅</span><div><div class="small">NEXT TARGET</div>'+goal+'</div></div>','run-race-card')+
    card('<div class="run-heading"><h2>'+yearMonth(state.month)+'の記録</h2><div class="run-month-controls">'+smallbtn("‹",'data-run-month="-1"')+smallbtn("›",'data-run-month="1"')+'</div></div>'+metrics(arr))+
-   card(titlebar("週間走行距離（月〜日）")+weeklyGraph(state.month,state.activities))+
-   card(titlebar("最近のランニング",smallbtn("すべて見る ›",'data-run-nav="history"'))+(state.activities.length?state.activities.slice(0,5).map(renderRow).join(""):empty("Garminの記録はまだ登録されていないよ。")));
+   card(titlebar("週間走行距離（月〜日）・直近5週")+weeklyGraph(state.activities))+
+   card('<div class="run-heading run-recent-heading"><h2>最近のランニング</h2><div class="run-recent-actions">'+
+     (state.role==="admin"?smallbtn("Garmin Connect",'data-run-sync-open="1" aria-haspopup="dialog" aria-controls="run-garmin-dialog"'):"")+
+     smallbtn("すべて見る ›",'data-run-nav="history"')+'</div></div>'+
+     recentWeekRows()+'<p class="small run-off-note">記録のない日は「オフ」と表示</p>');
  };
  const history=()=>card(titlebar("練習履歴",'<span class="small">'+state.activities.length+'件</span>')+(state.activities.length?state.activities.map(renderRow).join(""):empty("記録がまだないよ。")));
 
@@ -273,38 +299,54 @@
        button.disabled=false;
     }
  }
- function garminSyncCard(){
-   const canCheck=state.role==="admin";
-   const checkButton=canCheck?
-     smallbtn(state.syncLoading?"確認中…":"更新を確認",
-       'data-run-sync-preview="1"'+(state.syncLoading?' disabled aria-busy="true"':"")):"";
+ function garminSyncModal(){
+   if(!state.syncDialogOpen||state.view!=="home")return "";
+   const checkButton=smallbtn(state.syncLoading?"確認中…":"もう一度確認",
+      'data-run-sync-preview="1"'+(state.syncLoading?' disabled aria-busy="true"':""));
    const repairTarget=state.activities.find(a=>
      a.raw_summary?.sync_source==="garmin_personal_api_edge_v1" &&
      !Array.isArray(a.raw_summary?.hr_zones_seconds) &&
      /^\d{6,20}$/.test(String(a.garmin_activity_id||""))
    );
-   const repairButton=canCheck&&repairTarget?
-     '<button type="button" class="btn smallbtn" data-run-sync-repair="'+esc(repairTarget.garmin_activity_id)+'"'+
+   const repairButton=repairTarget?
+     '<button type="button" class="btn secondary smallbtn" data-run-sync-repair="'+esc(repairTarget.garmin_activity_id)+'"'+
        (state.syncLoading?' disabled aria-busy="true"':"")+'>心拍ゾーン・ピッチを再計算</button>':"";
-   const importButton=canCheck&&state.syncCandidate&&!state.syncImportedOnce?
+   const importButton=state.syncCandidate&&!state.syncImportedOnce?
      '<button type="button" class="btn smallbtn" data-run-sync-one="1"'+
        (state.syncLoading?' disabled aria-busy="true"':"")+'>1件だけ取り込む</button>':"";
-   const hint=canCheck
-     ? (state.syncMessage||"新しいランがあるか確認するよ。最初は確認だけで記録は変更しないよ。")
-     : "Garmin更新の確認は管理者アカウントで利用できるよ。";
-   const candidate=canCheck&&state.syncCandidate&&!state.syncImportedOnce?
-     '<p class="small">取り込み対象：'+esc(state.syncCandidate.title||"Garminランニング")+
+   const candidate=state.syncCandidate&&!state.syncImportedOnce?
+     '<p class="run-sync-target">対象：'+esc(state.syncCandidate.title||"Garminランニング")+
      '（'+esc(state.syncCandidate.startedAt?fdate(state.syncCandidate.startedAt):"日時不明")+'）</p>':"";
-   return card(titlebar("Garmin Connect",checkButton)+
-     '<p class="small" role="status">'+esc(hint)+'</p>'+candidate+
-     ((repairButton||importButton)?'<div class="run-entry-actions">'+repairButton+importButton+'</div>':""),"run-sync-card");
+   return '<div class="run-sync-overlay" data-run-sync-overlay="1">'+
+     '<div id="run-garmin-dialog" class="run-sync-dialog" role="dialog" aria-modal="true" aria-labelledby="run-sync-dialog-title">'+
+       '<div class="run-sync-dialog-heading"><h3 id="run-sync-dialog-title">Garmin Connect</h3>'+
+       '<button type="button" class="run-sync-close" data-run-sync-close="1" aria-label="閉じる">×</button></div>'+
+       '<p class="small" role="status" aria-live="polite">'+esc(state.syncMessage||"Garmin Connectから新しいランを確認するよ。確認だけでは記録は変更しないよ。")+'</p>'+
+       candidate+
+       '<div class="run-sync-dialog-actions">'+checkButton+repairButton+importButton+'</div>'+
+     '</div></div>';
+ }
+ function closeGarminSync(){
+   state.syncDialogOpen=false;
+   render();
+   root()?.querySelector('[data-run-sync-open]')?.focus();
+ }
+ function openGarminSync(){
+   if(state.role!=="admin"||state.syncDialogOpen)return;
+   state.syncDialogOpen=true;
+   state.syncMessage="Garmin Connectの更新を確認するよ。確認だけでは記録は変更しないよ。";
+   state.syncCandidate=null;
+   render();
+   root()?.querySelector('[data-run-sync-close]')?.focus();
+   previewGarminSync();
  }
  function render(){
-  const el=root();if(!el)return;
-  if(state.loading&&!state.loaded){el.innerHTML=card('<p class="small">ランニング記録を読み込み中…</p>');return;}
-  if(state.error){el.innerHTML=error(state.error);return;}
-  if(state.view==="detail"){renderDetail();return;}
-  el.innerHTML=nav()+garminSyncCard()+(state.view==="home"?home():state.view==="history"?history():state.view==="shoes"?shoes():races());
+   const el=root();if(!el)return;
+   if(state.loading&&!state.loaded){el.innerHTML=card('<p class="small">ランニング記録を読み込み中…</p>');return;}
+   if(state.error){el.innerHTML=error(state.error);return;}
+   if(state.view==="detail"){renderDetail();return;}
+   el.innerHTML=nav()+(state.view==="home"?home():state.view==="history"?history():state.view==="shoes"?shoes():races())+
+     garminSyncModal();
  }
  async function previewGarminSync(){
    if(state.role!=="admin"||state.syncLoading||!state.client)return;
@@ -775,13 +817,16 @@
    if(!state.ready){
      state.ready=true;
      root().addEventListener("click",e=>{
+       if(e.target?.dataset?.runSyncOverlay!==undefined){closeGarminSync();return;}
        const b=e.target.closest("button,[data-run-point]");if(!b)return;
+       if(b.dataset.runSyncOpen!==undefined){openGarminSync();return;}
+       if(b.dataset.runSyncClose!==undefined){closeGarminSync();return;}
        if(b.dataset.runBack!==undefined){state.view=state.returnView||"history";state.selected=null;render();return;}
        if(b.dataset.runRetry!==undefined){load();return;}
        if(b.dataset.runSyncPreview!==undefined){previewGarminSync();return;}
        if(b.dataset.runSyncOne!==undefined){importOneGarmin();return;}
        if(b.dataset.runSyncRepair!==undefined){repairImportedGarmin(b.dataset.runSyncRepair);return;}
-       if(b.dataset.runNav){state.editor=null;state.view=b.dataset.runNav;render();return;}
+       if(b.dataset.runNav){state.editor=null;state.syncDialogOpen=false;state.view=b.dataset.runNav;render();return;}
        if(b.dataset.runItemAdd){showCatalogEditor(b.dataset.runItemAdd);return;}
        if(b.dataset.runItemEdit){showCatalogEditor(b.dataset.runItemEdit,b.dataset.runItemId);return;}
        if(b.dataset.runEditorCancel!==undefined){state.editor=null;render();return;}
@@ -805,6 +850,18 @@
          const points=$("#run-plot")?._pointSamples||[],p=points[Number(b.dataset.runPoint)],out=$("#run-chart-info");if(!p||!out)return;
          out.textContent=state.axis==="lap"?(p.label+"・"+(segments[p.lap.segment_type]||"未分類")+"・"+fmtDist(p.lap.distance_m)+"・"+fmtTime(p.lap.duration_seconds)+"・ペース "+fmtPaceSec(p.pace)+"・平均心拍 "+(finite(p.hr)?Math.round(p.hr)+" bpm":"—")+"・最大心拍 "+(finite(p.lap.max_heart_rate_bpm)?Math.round(n(p.lap.max_heart_rate_bpm))+" bpm":"—")):(p.label+"・ペース "+fmtPaceSec(p.pace)+"・心拍 "+(finite(p.hr)?Math.round(p.hr)+" bpm":"—"));
          out.hidden=false;
+       }
+     });
+     root().addEventListener("keydown",e=>{
+       if(!state.syncDialogOpen)return;
+       if(e.key==="Escape"){e.preventDefault();closeGarminSync();return;}
+       if(e.key==="Tab"){
+         const dialog=root()?.querySelector("#run-garmin-dialog");
+         const items=[...(dialog?.querySelectorAll('button:not([disabled])')||[])];
+         if(!items.length)return;
+         const first=items[0],last=items[items.length-1];
+         if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
+         else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
        }
      });
      root().addEventListener("submit",e=>{
