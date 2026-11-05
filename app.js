@@ -44,12 +44,11 @@
       (Date.parse(day+"T12:00:00Z")-Date.parse("2026-10-21T12:00:00Z"))/(7*86400000)
     )%2===0;
     switch(weekday(day)){
-      case 1:return ["燃やせるごみ"];
-      case 2:return ["プラスチック"];
-      case 3:return ["びん","有害ごみ（小型充電式電池等）","せん定枝","スプレー缶",
-        alternate?"段ボール・茶色紙":"雑誌・本・雑がみ・牛乳等紙パック"];
-      case 4:return ["燃やせるごみ",alternate?"新聞・折込チラシ":"古布"];
-      case 5:return ["ペットボトル",alternate?"燃やせないごみ":"缶"];
+      case 1:return ["燃える"];
+      case 2:return ["プラ"];
+      case 3:return [alternate?"段ボール ビン 有害":"紙 ビン 有害"];
+      case 4:return [alternate?"新聞 燃える":"古布 燃える"];
+      case 5:return [alternate?"燃えない ペットボトル":"缶 ペットボトル"];
       default:return [];
     }
   }
@@ -528,11 +527,9 @@
   }
   function agendaDetails(day,row,compact=false){
     const lines=filledAgendaFields(row).map(k=>line(person[k],row[k],row[agendaUrlField(k)])).join("");
-    const garbage=garbageDisplayForDay(day);
-    const garbageLine=garbage.length?line("ゴミ",garbage.join("、")):"";
     return '<div class="dayrow'+(compact?' dayrow-inline':'')+'">'+
       (compact?"":'<button type="button" data-action="edit-day" data-day="'+day+'" class="daydate '+weekend(day)+'">'+fmtDay(day)+(holidayName(day)?' <span class="holiday-name">'+esc(holidayName(day))+'</span>':"")+'</button>')+
-      '<div class="daycontent">'+(lines||'<div class="empty">予定なし</div>')+garbageLine+'</div></div>';
+      '<div class="daycontent">'+(lines||'<div class="empty">予定なし</div>')+'</div></div>';
   }
   // Today/tomorrow use the same two-column person labels as the future agenda.
   // No outer "予定" row, so entries line up with lunch and garbage.
@@ -546,9 +543,6 @@
     if(!name)return "";
     if(name.endsWith("掃除"))return name;
     return name.replace(/(拭き|ふき)$/u,"")+"掃除";
-  }
-  function garbageScheduleLines(value){
-    return String(value||"").split(/\r?\n/u).map(x=>x.trim()).filter(Boolean);
   }
   function dueCleaningToday(today){
     return state.cleaning
@@ -1064,12 +1058,8 @@
     const entries=arr.map(day=>{
       const changed=state.draft.has(day),opened=state.opened.has(day);
       const preview=f.map(k=>monthValue(day,k)).filter(Boolean).map(x=>String(x).replace(/\s+/g," ").slice(0,20)).join(" / ");
-      const garbage=state.mode==="schedule"?garbageDisplayForDay(day):[];
-      const briefGarbage=garbage.length?"🗑 "+garbage[0]+(garbage.length>1?" ほか"+(garbage.length-1)+"種":""):"";
-      const garbageDetails=garbage.length?'<div class="month-garbage-info"><strong>🗑 ゴミ出し</strong>'+
-        '<div class="month-garbage-lines">'+garbage.map(x=>'<span>'+esc(x)+'</span>').join("")+'</div></div>':"";
-      return '<div class="monthday'+(changed?" dirty":"")+'"><button type="button" class="monthtop" data-action="expand-day" data-day="'+day+'"><span class="monthdate '+weekend(day)+'">'+fmtDay(day)+(holidayName(day)?'<span class="holiday-name month-holiday">'+esc(holidayName(day))+'</span>':"")+(changed?'<span class="changedmark">変更</span>':"")+'</span><span class="monthpreview">'+esc([preview,briefGarbage].filter(Boolean).join(" / ")||"未入力")+'</span><span class="tiny">'+(opened?"▲":"▼")+'</span></button>'+
-        (opened?'<div class="monthfields">'+garbageDetails+f.map(k=>'<label class="field">'+person[k]+'</label><textarea data-month-field="'+k+'" data-day="'+day+'" rows="'+(k==="lunch"?5:2)+'" placeholder="'+person[k]+'を入力・貼り付け">'+esc(monthValue(day,k))+'</textarea>').join("")+
+      return '<div class="monthday'+(changed?" dirty":"")+'"><button type="button" class="monthtop" data-action="expand-day" data-day="'+day+'"><span class="monthdate '+weekend(day)+'">'+fmtDay(day)+(holidayName(day)?'<span class="holiday-name month-holiday">'+esc(holidayName(day))+'</span>':"")+(changed?'<span class="changedmark">変更</span>':"")+'</span><span class="monthpreview">'+esc(preview||"未入力")+'</span><span class="tiny">'+(opened?"▲":"▼")+'</span></button>'+
+        (opened?'<div class="monthfields">'+f.map(k=>'<label class="field">'+person[k]+'</label><textarea data-month-field="'+k+'" data-day="'+day+'" rows="'+(k==="lunch"?5:2)+'" placeholder="'+person[k]+'を入力・貼り付け">'+esc(monthValue(day,k))+'</textarea>').join("")+
           (state.mode==="schedule"?agendaUrlEditor(key=>monthValue(day,key),day):"")+'</div>':"")+'</div>';
     });
     // On wide screens: 1–15 on the left, 16–the month's last day on the right.
