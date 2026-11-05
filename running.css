@@ -112,3 +112,17 @@
 .running-page .run-weekly{height:168px}
 .running-page .run-week-range span{display:block}
 @media(max-width:390px){.running-page .run-weekly{gap:5px}.running-page .run-week-range{font-size:9px}}
+
+
+/* Compact automatic workout title + Garmin HR zone label. */
+.running-page .run-training-title{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0}
+.running-page .run-training-title strong{display:inline;font-size:13px;line-height:1.42;overflow-wrap:anywhere}
+.running-page .run-title-line{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:5px 0 13px}
+.running-page .run-title-line h2.run-title{margin:0;line-height:1.35}
+.running-page .run-intensity{display:inline-flex;align-items:center;flex:0 0 auto;border-radius:6px;font-size:10px;font-weight:800;line-height:1.25;padding:4px 7px;letter-spacing:.005em;white-space:nowrap}
+.running-page .run-intensity-z1{background:#edf0f3;color:#566777}
+.running-page .run-intensity-z2{background:#e7f1ff;color:#2569b0}
+.running-page .run-intensity-z3{background:#e4f5e9;color:#168344}
+.running-page .run-intensity-z4{background:#fff0df;color:#ae6118}
+.running-page .run-intensity-z5{background:#ffebed;color:#b43447}
+@media(max-width:390px){.running-page .run-training-title strong{font-size:12px}.running-page .run-intensity{font-size:9px;padding:3px 6px}}

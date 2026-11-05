@@ -2,7 +2,7 @@
 "use strict";
 (function(){
  const root=()=>document.getElementById("running-root");
- const state={client:null,ready:false,loading:false,loaded:false,activities:[],shoes:[],races:[],view:"home",returnView:"home",selected:null,laps:[],points:[],axis:"time",lapPage:0,editing:false,month:"",error:""};
+ const state={client:null,ready:false,loading:false,loaded:false,activities:[],shoes:[],races:[],view:"home",returnView:"home",selected:null,laps:[],points:[],axis:"time",lapPage:0,intervalLaps:new Map(),editing:false,month:"",error:""};
  const kinds={jog:"ジョグ",easy:"ジョグ",long_run:"ロング走",pace_run:"ペース走",tempo_run:"テンポ走",intervals:"インターバル走",interval:"インターバル走",repetition:"レペティション",race:"レース",other:"その他"};
  const segments={warmup:"アップ",work:"疾走",recovery:"回復",cooldown:"ダウン",steady:"一定走",unknown:"未分類"};
  const esc=x=>String(x==null?"":x).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -30,7 +30,63 @@
   [["home","概要"],["history","練習履歴"],["shoes","シューズ"],["races","大会"]].map(([key,title])=>'<button type="button" data-run-nav="'+key+'" class="'+(state.view===key?"active":"")+'" aria-selected="'+(state.view===key)+'">'+title+"</button>").join("")+"</div>";
  const error=msg=>card('<p class="status err" role="alert">'+esc(msg)+'</p>'+smallbtn("再読み込み",'data-run-retry="1"'));
  const empty=msg=>'<div class="run-empty">'+esc(msg)+"</div>";
- const renderRow=a=>'<button class="run-activity" type="button" data-run-open="'+esc(a.id)+'"><span class="run-date">'+esc(activityDate(a).slice(5).replace("-","/"))+'</span><span class="run-activity-mid"><strong>'+esc(a.title||"ランニング")+'</strong><small>'+esc(fmtDist(a.distance_m))+' · '+esc(fmtPace(a.moving_time_seconds,a.distance_m))+' · '+(finite(a.avg_heart_rate_bpm)?esc(a.avg_heart_rate_bpm)+" bpm":"心拍なし")+'</small></span><span class="run-badge">'+esc(label(a.training_type))+'</span><span class="run-right">›</span></button>';
+
+ // Titles are derived from saved FIT metadata; nothing new to enter.
+ // The label reflects the dominant time-in-zone, not Garmin Training Effect
+ // or a diagnosis of fatigue.
+ const intensityNames={1:"Relax",2:"Easy",3:"Moderate",4:"Hard",5:"Expert"};
+ function intensityZone(a){
+   const seconds=a.raw_summary?.hr_zones_seconds;
+   if(!Array.isArray(seconds)||seconds.length!==6)return null;
+   if(!seconds.every(s=>Number.isFinite(Number(s))&&Number(s)>=0))return null;
+   const zones=[1,2,3,4,5];
+   const winner=zones.reduce((best,i)=>Number(seconds[i])>Number(seconds[best])?i:best,1);
+   return Number(seconds[winner])>0?winner:null;
+ }
+ function intensityBadge(a){
+   const zone=intensityZone(a);
+   return zone?'<span class="run-intensity run-intensity-z'+zone+'">'+intensityNames[zone]+'</span>':"";
+ }
+ function runningIntervals(a){
+   // Only trusted explicit workout type or clear work/recovery lap tags
+   // qualify as interval training; do not guess from pace spikes.
+   const active=state.selected?.id===a.id&&state.laps.length?state.laps:
+     state.intervalLaps.get(a.id)||[];
+   const work=active.filter(x=>x.segment_type==="work");
+   const recovery=active.filter(x=>x.segment_type==="recovery");
+   return {work,recovery,confirmed:work.length>=2&&recovery.length>=1};
+ }
+ function autoRunTitle(a){
+   const min=finite(a.moving_time_seconds)&&n(a.moving_time_seconds)>0?n(a.moving_time_seconds)/60:NaN;
+   // Rounded duration is for a short title only; the exact time is unchanged
+   // in the running stats and activity detail.
+   const rounded=Number.isFinite(min)?Math.max(1,Math.round(min/5)*5):null;
+   const time=rounded===null?"":rounded+"分";
+   const kind=a.training_type||"";
+   const intervals=runningIntervals(a);
+   const isInterval=["interval","intervals","repetition"].includes(kind)||intervals.confirmed;
+   let name;
+   if(isInterval){
+     name=kind==="repetition"?"レペティション":"インターバル";
+     if(intervals.work.length>=2){
+       const lengths=intervals.work.map(x=>n(x.distance_m)).filter(x=>Number.isFinite(x)&&x>0).sort((x,y)=>x-y);
+       if(lengths.length===intervals.work.length){
+         const median=lengths[Math.floor(lengths.length/2)];
+         if(lengths.every(x=>Math.abs(x-median)<=Math.max(25,median*.08))){
+           const length=Math.round(median/10)*10;
+           return (time?time+" ":"")+length+"m×"+lengths.length+" "+name;
+         }
+       }
+     }
+   }else if(kind==="race")name="レース";
+   else if(kind==="pace_run")name="ペース走";
+   else if(kind==="tempo_run")name="テンポ走";
+   else if(kind==="long_run"||(Number.isFinite(min)&&min>=90))name="ロング";
+   else if(kind==="other"||(Number.isFinite(min)&&min<10&&kind!=="jog"&&kind!=="easy"))name="ラン";
+   else name="ジョグ";
+   return time+name;
+ }
+ const renderRow=a=>'<button class="run-activity" type="button" data-run-open="'+esc(a.id)+'"><span class="run-date">'+esc(activityDate(a).slice(5).replace("-","/"))+'</span><span class="run-activity-mid"><span class="run-training-title"><strong>'+esc(autoRunTitle(a))+'</strong>'+intensityBadge(a)+'</span><small>'+esc(fmtDist(a.distance_m))+' · '+esc(fmtPace(a.moving_time_seconds,a.distance_m))+' · '+(finite(a.avg_heart_rate_bpm)?esc(a.avg_heart_rate_bpm)+" bpm":"心拍なし")+'</small></span><span class="run-right">›</span></button>';
  const monthly=()=>state.activities.filter(a=>activityDate(a).slice(0,7)===state.month);
  const metrics=arr=>{let km=sum(arr,a=>a.distance_m),time=sum(arr,a=>a.moving_time_seconds);return '<div class="run-metrics">'+
    [["走行距離",km?(km/1000).toFixed(2)+" km":"0 km"],["練習回数",arr.length+"回"],["合計時間",fmtTime(time)],["平均ペース",km>0?fmtPace(time,km):"—"]].map(([l,v])=>'<div class="run-stat"><div>'+l+'</div><strong>'+v+"</strong></div>").join("")+"</div>";};
@@ -103,12 +159,21 @@
    if(!state.ready||state.loading)return;
    state.loading=true;state.error="";render();
    try{
-     const [a,s,r]=await Promise.all([
+     const [a,s,r,tagged]=await Promise.all([
        state.client.from("running_activities").select("id,garmin_activity_id,started_at,title,activity_type,distance_m,moving_time_seconds,elapsed_time_seconds,avg_heart_rate_bpm,max_heart_rate_bpm,avg_cadence_spm,training_type,shoe_id,race_id,rpe,fatigue,pain_note,memo,raw_summary").order("started_at",{ascending:false}).limit(1000),
        state.client.from("running_shoes").select("id,shoe_name,baseline_distance_m,retired_on").order("shoe_name"),
-       state.client.from("running_races").select("id,race_name,race_date,race_month,distance_m,registration_status,target_time_seconds").order("race_date",{ascending:true,nullsFirst:false})
+       state.client.from("running_races").select("id,race_name,race_date,race_month,distance_m,registration_status,target_time_seconds").order("race_date",{ascending:true,nullsFirst:false}),
+       state.client.from("running_laps").select("activity_id,lap_index,distance_m,segment_type").in("segment_type",["work","recovery"]).order("lap_index").limit(1000)
      ]);
-     state.activities=checked(a);state.shoes=checked(s);state.races=checked(r);state.loaded=true;
+     state.activities=checked(a);state.shoes=checked(s);state.races=checked(r);
+     state.intervalLaps=new Map();
+     if(!tagged.error){
+       for(const lap of tagged.data||[]){
+         const current=state.intervalLaps.get(lap.activity_id)||[];
+         current.push(lap);state.intervalLaps.set(lap.activity_id,current);
+       }
+     }else console.warn("Interval lap metadata unavailable:",tagged.error.message);
+     state.loaded=true;
    }catch(e){state.error="記録を取得できなかったよ: "+(e.message||String(e));}
    finally{state.loading=false;render();}
  }
@@ -224,7 +289,7 @@
    const a=state.selected,el=root();if(!a||!el)return;
    const g=state.points.length, l=state.laps.length;
    el.innerHTML='<button class="run-back" type="button" data-run-back="1">‹ ランニングに戻る</button>'+
-   card('<div class="run-hero-label">Garmin FIT · '+esc(fdate(a.started_at))+'</div><h2 class="run-title">'+esc(a.title||"ランニング")+'</h2>'+metricCard(a)+
+   card('<div class="run-hero-label">Garmin FIT · '+esc(fdate(a.started_at))+'</div><div class="run-title-line"><h2 class="run-title">'+esc(autoRunTitle(a))+'</h2>'+intensityBadge(a)+'</div>'+metricCard(a)+
    '<div class="run-details-strip"><span>最大心拍 '+esc(finite(a.max_heart_rate_bpm)?a.max_heart_rate_bpm+" bpm":"—")+'</span><span>Garminラップ '+l+'件</span><span>グラフ '+g+'点</span></div>')+
    effortCard(a)+
    card(titlebar("ペース・心拍の推移")+
