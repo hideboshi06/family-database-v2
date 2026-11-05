@@ -34,11 +34,48 @@
  const monthly=()=>state.activities.filter(a=>activityDate(a).slice(0,7)===state.month);
  const metrics=arr=>{let km=sum(arr,a=>a.distance_m),time=sum(arr,a=>a.moving_time_seconds);return '<div class="run-metrics">'+
    [["走行距離",km?(km/1000).toFixed(2)+" km":"0 km"],["練習回数",arr.length+"回"],["合計時間",fmtTime(time)],["平均ペース",km>0?fmtPace(time,km):"—"]].map(([l,v])=>'<div class="run-stat"><div>'+l+'</div><strong>'+v+"</strong></div>").join("")+"</div>";};
- const weeklyGraph=arr=>{
-   const weeks=[0,0,0,0,0];
-   for(const a of arr){const day=Number(activityDate(a).slice(8));const idx=Math.min(4,Math.floor((day-1)/7));weeks[idx]+=n(a.distance_m)||0;}
-   const max=Math.max(...weeks,1000);
-   return '<div class="run-weekly">'+weeks.map((v,i)=>'<div class="run-week"><span>'+((v/1000).toFixed(1))+'</span><div class="run-week-well"><div class="run-week-bar" style="height:'+Math.max(v?4:0,v/max*100)+'%"></div></div><small>'+["1–7日","8–14日","15–21日","22–28日","29日〜"][i]+'</small></div>').join("")+"</div>";
+ // Use real Monday–Sunday calendar weeks in Japan, even when a week crosses
+ // the selected month's boundary. The month totals above stay month-only.
+ const weeklyGraph=(yearMonth,allActivities)=>{
+   const [year,month]=yearMonth.split("-").map(Number);
+   const day=86400000;
+   const first=Date.UTC(year,month-1,1);
+   const last=Date.UTC(year,month,0);
+   const mondayOffset=d=>(new Date(d).getUTCDay()+6)%7;
+   const firstMonday=first-mondayOffset(first)*day;
+   const lastSunday=last+(6-mondayOffset(last))*day;
+   const toDay=d=>new Date(d).toISOString().slice(0,10);
+   const label=d=>{const date=new Date(d);return (date.getUTCMonth()+1)+"/"+date.getUTCDate();};
+   const distanceByDay=new Map();
+   const timeByDay=new Map();
+   for(const activity of allActivities){
+     const date=activityDate(activity);
+     distanceByDay.set(date,(distanceByDay.get(date)||0)+(finite(activity.distance_m)?n(activity.distance_m):0));
+     timeByDay.set(date,(timeByDay.get(date)||0)+(finite(activity.moving_time_seconds)?n(activity.moving_time_seconds):0));
+   }
+   const weeks=[];
+   for(let monday=firstMonday;monday<=lastSunday;monday+=7*day){
+     let meters=0,seconds=0;
+     for(let dayIndex=0;dayIndex<7;dayIndex++){
+       const date=toDay(monday+dayIndex*day);
+       meters+=distanceByDay.get(date)||0;
+       seconds+=timeByDay.get(date)||0;
+     }
+     const sunday=monday+6*day;
+     weeks.push({meters,seconds,monday,sunday,
+       firstLabel:label(monday),lastLabel:label(sunday)});
+   }
+   const max=Math.max(1000,...weeks.map(x=>x.meters));
+   return '<div class="run-weekly" role="group" aria-label="月曜から日曜までの週間走行距離">'+
+     weeks.map(w=>{
+       const km=(w.meters/1000).toFixed(1);
+       const height=w.meters?Math.max(4,w.meters/max*100):0;
+       const fullLabel=w.firstLabel+"〜"+w.lastLabel;
+       return '<div class="run-week" title="'+fullLabel+"・"+km+"km・"+fmtTime(w.seconds)+'">'+
+         '<span>'+km+'</span>'+
+         '<div class="run-week-well"><div class="run-week-bar" style="height:'+height.toFixed(2)+'%"></div></div>'+
+         '<small class="run-week-range"><span>'+w.firstLabel+'</span><span>〜'+w.lastLabel+'</span></small></div>';
+     }).join("")+'</div>';
  };
  const home=()=>{
    const arr=monthly();
@@ -46,7 +83,7 @@
    const goal=current?'<strong>'+esc(current.race_name)+'</strong><p class="small">'+esc(current.race_date||current.race_month||"日程未定")+' · '+(n(current.distance_m)/1000).toFixed(2)+' km</p>':'<strong>2027年3月 ハーフマラソン</strong><p class="small">大会名・日程は未登録</p>';
    return card('<div class="run-race-info"><span class="run-race-icon">🏅</span><div><div class="small">NEXT TARGET</div>'+goal+'</div></div>','run-race-card')+
    card('<div class="run-heading"><h2>'+yearMonth(state.month)+'の記録</h2><div class="run-month-controls">'+smallbtn("‹",'data-run-month="-1"')+smallbtn("›",'data-run-month="1"')+'</div></div>'+metrics(arr))+
-   card(titlebar("月内の走行距離（7日区分）")+weeklyGraph(arr))+
+   card(titlebar("週間走行距離（月〜日）")+weeklyGraph(state.month,state.activities))+
    card(titlebar("最近のランニング",smallbtn("すべて見る ›",'data-run-nav="history"'))+(state.activities.length?state.activities.slice(0,5).map(renderRow).join(""):empty("Garminの記録はまだ登録されていないよ。")));
  };
  const history=()=>card(titlebar("練習履歴",'<span class="small">'+state.activities.length+'件</span>')+(state.activities.length?state.activities.map(renderRow).join(""):empty("記録がまだないよ。")));

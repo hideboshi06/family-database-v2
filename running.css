@@ -105,3 +105,10 @@
 .running-page .run-zone-caption{color:var(--sub);font-size:10px;margin-top:10px}
 .running-page .run-zone-comparison{border-top:1px solid #edf2f6;margin-top:9px;padding-top:9px;color:#53718b;font-size:11px}
 @media(max-width:380px){.running-page .run-zone-main{font-size:11px}.running-page .run-zone-labels span{font-size:9px;gap:3px}}
+
+/* ISO-style Monday-to-Sunday calendar weeks, including partial-month weeks. */
+.running-page .run-week-range{display:flex;flex-direction:column;align-items:center;gap:0;line-height:1.12;white-space:nowrap;font-variant-numeric:tabular-nums}
+.running-page .run-week{gap:4px}
+.running-page .run-weekly{height:168px}
+.running-page .run-week-range span{display:block}
+@media(max-width:390px){.running-page .run-weekly{gap:5px}.running-page .run-week-range{font-size:9px}}
