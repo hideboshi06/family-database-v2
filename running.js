@@ -2,7 +2,7 @@
 "use strict";
 (function(){
  const root=()=>document.getElementById("running-root");
- const state={client:null,ready:false,loading:false,loaded:false,role:"member",syncLoading:false,syncDialogOpen:false,syncMessage:"",syncAllCandidates:[],syncScopeDays:14,syncCandidates:[],syncTotal:0,syncProcessed:0,syncImported:0,syncSkipped:0,syncRunning:false,syncStopRequested:false,activities:[],shoes:[],races:[],view:"home",returnView:"home",selected:null,laps:[],points:[],axis:"time",lapPage:0,intervalLaps:new Map(),editing:false,editor:null,month:"",error:""};
+ const state={client:null,ready:false,loading:false,loaded:false,role:"member",syncLoading:false,syncDialogOpen:false,syncMessage:"",syncAllCandidates:[],syncScopeDays:14,syncCandidates:[],syncTotal:0,syncProcessed:0,syncImported:0,syncSkipped:0,syncRunning:false,syncStopRequested:false,activities:[],shoes:[],races:[],view:"home",returnView:"home",selected:null,laps:[],points:[],axis:"time",lapPage:0,intervalLaps:new Map(),editing:false,editor:null,month:"",historyMonth:"",error:""};
  const kinds={jog:"ジョグ",easy:"ジョグ",long_run:"ロング走",pace_run:"ペース走",tempo_run:"テンポ走",intervals:"インターバル走",interval:"インターバル走",repetition:"レペティション",race:"レース",other:"その他"};
  const segments={warmup:"アップ",work:"疾走",recovery:"回復",cooldown:"ダウン",steady:"一定走",unknown:"未分類"};
  const esc=x=>String(x==null?"":x).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -172,7 +172,29 @@
      smallbtn("すべて見る ›",'data-run-nav="history"')+'</div></div>'+
      recentWeekRows()+'<p class="small run-off-note">記録のない日は「オフ」と表示</p>');
  };
- const history=()=>card(titlebar("ランニング履歴",'<span class="small">'+state.activities.length+'件</span>')+(state.activities.length?state.activities.map(renderRow).join(""):empty("記録がまだないよ。")));
+ // Only show one calendar month at a time; allow direct jumps to months with
+ // recorded runs and always include the current JST month.
+ const historyMonths=()=>[...new Set([currentMonth(),...state.activities.map(a=>activityDate(a).slice(0,7))])]
+   .sort((a,b)=>b.localeCompare(a));
+ const history=()=>{
+   const months=historyMonths();
+   const selected=months.includes(state.historyMonth)?state.historyMonth:months[0];
+   const index=months.indexOf(selected);
+   const runs=state.activities.filter(a=>activityDate(a).slice(0,7)===selected);
+   const pager=()=>'<nav class="run-history-pager" aria-label="ランニング履歴の月を切り替え">'+
+     '<button type="button" data-run-history-step="1" aria-label="前の記録月へ" '+
+       (index===months.length-1?'disabled':'')+'>‹</button>'+
+     '<select data-run-history-select aria-label="表示する年月">'+
+       options(months.map(ym=>[ym,yearMonth(ym)]),selected)+'</select>'+
+     '<button type="button" data-run-history-step="-1" aria-label="次の記録月へ" '+
+       (index===0?'disabled':'')+'>›</button></nav>';
+   return card('<div id="run-history-top"></div>'+titlebar("ランニング履歴",'<span class="small">全'+state.activities.length+'件</span>')+
+     pager()+
+     '<p class="run-history-month-summary">'+esc(yearMonth(selected))+' · '+runs.length+
+       '件 · '+esc(fmtDist(sum(runs,a=>a.distance_m)))+'</p>'+
+     (runs.length?runs.map(renderRow).join(""):empty("この月のランニング記録はまだないよ。"))+
+     (runs.length>=8?'<div class="run-history-bottom">'+pager()+'</div>':""));
+ };
 
  // Shoe and race master data are entered once, not after every run.
  // Each form writes through the authenticated Supabase client and existing RLS.
@@ -896,7 +918,7 @@
  }
  function init({client,role}={}){
    if(!client||!root())return;
-   state.client=client;state.role=role==="admin"?"admin":"member";state.month=currentMonth();
+   state.client=client;state.role=role==="admin"?"admin":"member";state.month=currentMonth();state.historyMonth=currentMonth();
    if(!state.ready){
      state.ready=true;
      root().addEventListener("click",e=>{
@@ -910,12 +932,22 @@
        if(b.dataset.runSyncAll!==undefined){syncAllGarmin();return;}
        if(b.dataset.runSyncStop!==undefined){state.syncStopRequested=true;state.syncMessage="現在の1件が終わったら中断するよ。";render();return;}
        if(b.dataset.runSyncRepair!==undefined){repairImportedGarmin(b.dataset.runSyncRepair);return;}
-       if(b.dataset.runNav){if(state.syncRunning)return;state.editor=null;state.syncDialogOpen=false;state.view=b.dataset.runNav;render();return;}
+       if(b.dataset.runNav){
+         if(state.syncRunning)return;
+         if(b.dataset.runNav==="history"&&state.view==="home")state.historyMonth=state.month;
+         state.editor=null;state.syncDialogOpen=false;state.view=b.dataset.runNav;render();return;
+       }
        if(b.dataset.runItemAdd){showCatalogEditor(b.dataset.runItemAdd);return;}
        if(b.dataset.runItemEdit){showCatalogEditor(b.dataset.runItemEdit,b.dataset.runItemId);return;}
        if(b.dataset.runEditorCancel!==undefined){state.editor=null;render();return;}
        if(b.dataset.runOpen){open(b.dataset.runOpen);return;}
        if(b.dataset.runMonth){state.month=changeMonth(state.month,Number(b.dataset.runMonth));render();return;}
+       if(b.dataset.runHistoryStep!==undefined){
+         const months=historyMonths(),selected=months.includes(state.historyMonth)?state.historyMonth:months[0];
+         const i=months.indexOf(selected),next=months[i+Number(b.dataset.runHistoryStep)];
+         if(next){state.historyMonth=next;render();$("#run-history-top")?.scrollIntoView({block:"start"});}
+         return;
+       }
        if(b.dataset.runAxis){state.axis=b.dataset.runAxis;state.lapPage=0;renderGraph();root().querySelectorAll("[data-run-axis]").forEach(x=>{x.classList.toggle("active",x.dataset.runAxis===state.axis);x.setAttribute("aria-selected",x.dataset.runAxis===state.axis?"true":"false");});return;}
        if(b.dataset.runLapPage!==undefined){
          const width=$("#run-plot")?.clientWidth||360;
@@ -937,6 +969,11 @@
        }
      });
      root().addEventListener("change",e=>{
+       if(e.target?.dataset?.runHistorySelect!==undefined){
+         const month=String(e.target.value);
+         if(historyMonths().includes(month)){state.historyMonth=month;render();$("#run-history-top")?.scrollIntoView({block:"start"});}
+         return;
+       }
        if(e.target?.dataset?.runSyncScope===undefined||state.syncLoading)return;
        const days=Number(e.target.value);
        if(![14,30,365].includes(days))return;
