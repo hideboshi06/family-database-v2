@@ -147,3 +147,23 @@
 
 /* Distinguish Garmin-reported average stride from pace/cadence-based estimates. */
 .running-page .run-stride-source{font-size:11px;color:var(--sub);margin:10px 0 0;line-height:1.55}
+
+/* Garmin status lives in a compact modal, launched beside recent runs. */
+.running-page .run-recent-heading{flex-wrap:wrap;row-gap:7px}
+.running-page .run-recent-actions{display:flex;align-items:center;gap:5px;margin-left:auto}
+.running-page .run-recent-actions .smallbtn{font-size:11px;padding:7px 8px;white-space:nowrap}
+.running-page .run-off-row{cursor:default;background:#fbfcfe}
+.running-page .run-off-row .run-activity-mid strong{font-size:12px;font-weight:700;color:var(--sub)}
+.running-page .run-off-note{font-size:10px;line-height:1.4;margin:9px 2px 0;color:var(--sub)}
+.running-page .run-week-current .run-week-bar{background:var(--navy)}
+.running-page .run-week-current .run-week-range{color:var(--navy);font-weight:800}
+.running-page .run-sync-overlay{position:fixed;inset:0;z-index:2000;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(16,34,52,.5);box-sizing:border-box}
+.running-page .run-sync-dialog{box-sizing:border-box;width:min(100%,440px);max-height:calc(100dvh - 36px);overflow-y:auto;background:#fff;color:var(--ink);border:1px solid #e3ebf1;border-radius:16px;box-shadow:0 18px 55px rgba(14,34,55,.25);padding:19px}
+.running-page .run-sync-dialog-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.running-page .run-sync-dialog-heading h3{font-size:17px;font-weight:800;margin:0}
+.running-page .run-sync-close{border:0;background:#f0f4f7;color:var(--ink);border-radius:50%;width:34px;height:34px;flex:0 0 34px;display:grid;place-items:center;font-size:24px;cursor:pointer}
+.running-page .run-sync-dialog .small{line-height:1.6;margin:0 0 13px}
+.running-page .run-sync-target{margin:10px 0;font-size:12px;font-weight:700;color:var(--navy);line-height:1.5}
+.running-page .run-sync-dialog-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.running-page .run-sync-dialog-actions .smallbtn{font-size:12px;min-height:35px}
+@media(max-width:380px){.running-page .run-recent-heading h2{font-size:14px}.running-page .run-recent-actions .smallbtn{font-size:10px;padding:7px 6px}.running-page .run-sync-dialog{padding:16px}}
