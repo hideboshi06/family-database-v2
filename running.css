@@ -180,3 +180,14 @@
 /* Opt-in historical Garmin sync; only the recent 14 days are selected by default. */
 .running-page .run-sync-scope{display:flex;justify-content:space-between;align-items:center;gap:12px;color:var(--sub);font-size:12px;font-weight:650;margin:11px 0}
 .running-page .run-sync-scope select{min-width:120px;max-width:50%;font:inherit;padding:7px 9px;border:1px solid #c9d9e6;border-radius:8px;background:#fff;color:var(--navy)}
+
+/* Monthly running-history navigation. Both the top and bottom controls
+   use the same selected month so long histories are easy to browse. */
+.running-page .run-history-pager{display:flex;align-items:center;justify-content:center;gap:9px;margin:5px 0 10px}
+.running-page .run-history-pager button{display:grid;place-items:center;width:40px;height:40px;flex:0 0 40px;border:1px solid #cadbe9;border-radius:10px;background:#f4f9fc;color:var(--navy);font-size:23px;font-weight:750;cursor:pointer}
+.running-page .run-history-pager button:disabled{opacity:.3;cursor:default}
+.running-page .run-history-pager select{min-width:0;width:180px;max-width:calc(100% - 100px);height:40px;padding:8px 12px;border:1px solid #cadbe9;border-radius:10px;background:#fff;color:var(--navy);font:inherit;font-size:14px;font-weight:750;text-align:center}
+.running-page .run-history-pager button:focus-visible,.running-page .run-history-pager select:focus-visible{outline:2px solid var(--navy);outline-offset:2px}
+.running-page .run-history-month-summary{text-align:center;color:var(--sub);font-size:12px;margin:0 0 12px}
+.running-page .run-history-bottom{margin-top:12px;padding-top:10px;border-top:1px solid #eef2f6}
+.running-page #run-history-top{scroll-margin-top:12px}
