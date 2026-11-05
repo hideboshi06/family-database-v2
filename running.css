@@ -176,3 +176,7 @@
 .running-page .run-sync-progress-track>div{height:100%;background:var(--navy);border-radius:20px;transition:width .2s ease}
 .running-page .run-sync-footnote{margin:12px 0 0;font-size:10px;color:var(--sub)}
 .running-page .run-sync-close:disabled{opacity:.45;cursor:not-allowed}
+
+/* Opt-in historical Garmin sync; only the recent 14 days are selected by default. */
+.running-page .run-sync-scope{display:flex;justify-content:space-between;align-items:center;gap:12px;color:var(--sub);font-size:12px;font-weight:650;margin:11px 0}
+.running-page .run-sync-scope select{min-width:120px;max-width:50%;font:inherit;padding:7px 9px;border:1px solid #c9d9e6;border-radius:8px;background:#fff;color:var(--navy)}
