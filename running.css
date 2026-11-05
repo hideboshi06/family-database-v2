@@ -144,3 +144,6 @@
 @media(min-width:660px){.running-page .run-entry-form{grid-template-columns:repeat(2,minmax(0,1fr))}
 .running-page .run-entry-form h3,.running-page .run-entry-details,.running-page .run-entry-actions,.running-page .run-entry-status{grid-column:1/-1}
 .running-page .run-entry-details-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Distinguish Garmin-reported average stride from pace/cadence-based estimates. */
+.running-page .run-stride-source{font-size:11px;color:var(--sub);margin:10px 0 0;line-height:1.55}
