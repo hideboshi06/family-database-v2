@@ -137,12 +137,7 @@
    const arr=monthly();
    const current=state.races.filter(x=>x.registration_status!=="cancelled" && (x.race_date||x.race_month)>=dateKey(new Date().toISOString())).sort((a,b)=>(a.race_date||a.race_month).localeCompare(b.race_date||b.race_month))[0];
    const goal=current?'<strong>'+esc(current.race_name)+'</strong><p class="small">'+esc(current.race_date||current.race_month||"日程未定")+' · '+(n(current.distance_m)/1000).toFixed(2)+' km</p>':'<strong>2027年3月 ハーフマラソン</strong><p class="small">大会名・日程は未登録</p>';
-   const syncCard=state.role==="admin"?card(
-     titlebar("Garmin Connect",smallbtn(state.syncLoading?"確認中…":"更新を確認",'data-run-sync-preview="1"'+(state.syncLoading?' disabled aria-busy="true"':"")))+
-     '<p class="small" role="status">'+esc(state.syncMessage||"新しいランがあるか確認するよ。確認だけなので記録は変更しないよ。")+'</p>',
-     "run-sync-card"
-   ):"";
-   return syncCard+card('<div class="run-race-info"><span class="run-race-icon">🏅</span><div><div class="small">NEXT TARGET</div>'+goal+'</div></div>','run-race-card')+
+   return card('<div class="run-race-info"><span class="run-race-icon">🏅</span><div><div class="small">NEXT TARGET</div>'+goal+'</div></div>','run-race-card')+
    card('<div class="run-heading"><h2>'+yearMonth(state.month)+'の記録</h2><div class="run-month-controls">'+smallbtn("‹",'data-run-month="-1"')+smallbtn("›",'data-run-month="1"')+'</div></div>'+metrics(arr))+
    card(titlebar("週間走行距離（月〜日）")+weeklyGraph(state.month,state.activities))+
    card(titlebar("最近のランニング",smallbtn("すべて見る ›",'data-run-nav="history"'))+(state.activities.length?state.activities.slice(0,5).map(renderRow).join(""):empty("Garminの記録はまだ登録されていないよ。")));
@@ -278,12 +273,23 @@
        button.disabled=false;
     }
  }
+ function garminSyncCard(){
+   const canCheck=state.role==="admin";
+   const action=canCheck
+     ? smallbtn(state.syncLoading?"確認中…":"更新を確認",'data-run-sync-preview="1"'+(state.syncLoading?' disabled aria-busy="true"':""))
+     : "";
+   const hint=canCheck
+     ? (state.syncMessage||"新しいランがあるか確認するよ。確認だけなので記録は変更しないよ。")
+     : "Garmin更新の確認は管理者アカウントで利用できるよ。";
+   return card(titlebar("Garmin Connect",action)+
+     '<p class="small" role="status">'+esc(hint)+'</p>',"run-sync-card");
+ }
  function render(){
   const el=root();if(!el)return;
   if(state.loading&&!state.loaded){el.innerHTML=card('<p class="small">ランニング記録を読み込み中…</p>');return;}
   if(state.error){el.innerHTML=error(state.error);return;}
   if(state.view==="detail"){renderDetail();return;}
-  el.innerHTML=nav()+(state.view==="home"?home():state.view==="history"?history():state.view==="shoes"?shoes():races());
+  el.innerHTML=nav()+garminSyncCard()+(state.view==="home"?home():state.view==="history"?history():state.view==="shoes"?shoes():races());
  }
  async function previewGarminSync(){
    if(state.role!=="admin"||state.syncLoading||!state.client)return;
