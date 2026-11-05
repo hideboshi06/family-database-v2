@@ -2,7 +2,7 @@
 "use strict";
 (function(){
  const root=()=>document.getElementById("running-root");
- const state={client:null,ready:false,loading:false,loaded:false,role:"member",syncLoading:false,syncDialogOpen:false,syncMessage:"",syncCandidates:[],syncTotal:0,syncProcessed:0,syncImported:0,syncSkipped:0,syncRunning:false,syncStopRequested:false,activities:[],shoes:[],races:[],view:"home",returnView:"home",selected:null,laps:[],points:[],axis:"time",lapPage:0,intervalLaps:new Map(),editing:false,editor:null,month:"",error:""};
+ const state={client:null,ready:false,loading:false,loaded:false,role:"member",syncLoading:false,syncDialogOpen:false,syncMessage:"",syncAllCandidates:[],syncScopeDays:14,syncCandidates:[],syncTotal:0,syncProcessed:0,syncImported:0,syncSkipped:0,syncRunning:false,syncStopRequested:false,activities:[],shoes:[],races:[],view:"home",returnView:"home",selected:null,laps:[],points:[],axis:"time",lapPage:0,intervalLaps:new Map(),editing:false,editor:null,month:"",error:""};
  const kinds={jog:"ジョグ",easy:"ジョグ",long_run:"ロング走",pace_run:"ペース走",tempo_run:"テンポ走",intervals:"インターバル走",interval:"インターバル走",repetition:"レペティション",race:"レース",other:"その他"};
  const segments={warmup:"アップ",work:"疾走",recovery:"回復",cooldown:"ダウン",steady:"一定走",unknown:"未分類"};
  const esc=x=>String(x==null?"":x).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -299,9 +299,31 @@
        button.disabled=false;
     }
  }
+ // The backend searches the full year to find missed activities, but
+ // the modal defaults to two weeks so a large historical backlog stays opt-in.
+ function chooseSyncCandidates(){
+   const days=state.syncScopeDays;
+   const today=dateKey(new Date().toISOString());
+   const from=new Date(Date.parse(today+"T00:00:00Z")-(days-1)*86400000).toISOString().slice(0,10);
+   state.syncCandidates=state.syncAllCandidates.filter(item=>
+     days===365 || (item.startedAt && dateKey(item.startedAt)>=from)
+   );
+ }
+ function syncScopeSummary(){
+   const total=state.syncAllCandidates.length,selected=state.syncCandidates.length;
+   if(!total)return "未取り込みのランはないよ。";
+   const scope=state.syncScopeDays===365?"過去365日":("最近"+state.syncScopeDays+"日");
+   return "過去365日の未取り込み"+total+"件のうち、"+scope+"の対象は"+selected+"件だよ。";
+ }
  function garminSyncModal(){
    if(!state.syncDialogOpen||state.view!=="home")return "";
    const total=state.syncCandidates.length;
+   const batchSize=Math.min(total,10);
+   const scopeSelect='<label class="run-sync-scope">取り込み対象の期間<select data-run-sync-scope="1" aria-label="取り込み対象の期間"'+
+     (state.syncLoading?' disabled':"")+'>'+
+     [[14,"最近14日"],[30,"最近30日"],[365,"過去365日"]].map(([days,label])=>
+       '<option value="'+days+'"'+(state.syncScopeDays===days?' selected':"")+'>'+label+'</option>'
+     ).join("")+'</select></label>';
    const checkButton=smallbtn(state.syncLoading?"確認中…":"もう一度確認",
      'data-run-sync-preview="1"'+(state.syncLoading?' disabled aria-busy="true"':""));
    const repairTarget=state.activities.find(a=>
@@ -311,8 +333,8 @@
    );
    const repairButton=!state.syncLoading && repairTarget?
      '<button type="button" class="btn secondary smallbtn" data-run-sync-repair="'+esc(repairTarget.garmin_activity_id)+'">過去の取り込みを修復</button>':"";
-   const importButton=total && !state.syncLoading?
-     '<button type="button" class="btn smallbtn" data-run-sync-all="1">'+total+'件を取り込む</button>':"";
+   const importButton=batchSize && !state.syncLoading?
+     '<button type="button" class="btn smallbtn" data-run-sync-all="1">'+batchSize+'件を取り込む</button>':"";
    const stopButton=state.syncRunning?
      '<button type="button" class="btn secondary smallbtn" data-run-sync-stop="1"'+
        (state.syncStopRequested?' disabled':"")+'>'+(state.syncStopRequested?"中断中…":"この後中断")+'</button>':"";
@@ -330,6 +352,8 @@
          (state.syncRunning?' disabled title="取り込み中は中断してから閉じてね"':"")+'>×</button></div>'+
        '<p class="small" role="status" aria-live="polite">'+esc(state.syncMessage||
          "Garmin Connectの新しいランを確認するよ。確認だけでは記録は変更しないよ。")+'</p>'+
+       scopeSelect+
+       (total>batchSize?'<p class="small">安全のため1回につき最大10件ずつ取り込むよ。</p>':"")+
        progress+
        '<div class="run-sync-dialog-actions">'+checkButton+repairButton+importButton+stopButton+'</div>'+
        '<p class="small run-sync-footnote">直近365日を確認。登録済みのランは上書きせず、1件ずつ安全に取り込むよ。</p>'+
@@ -345,7 +369,8 @@
    if(state.role!=="admin"||state.syncDialogOpen)return;
    state.syncDialogOpen=true;
    state.syncMessage="Garmin Connectに新しいランがないか確認するよ。";
-   state.syncCandidates=[];
+   state.syncAllCandidates=[];state.syncCandidates=[];
+   state.syncScopeDays=14;
    state.syncTotal=0;state.syncProcessed=0;state.syncImported=0;state.syncSkipped=0;
    render();
    previewGarminSync();
@@ -369,7 +394,7 @@
  async function previewGarminSync(){
    if(state.role!=="admin"||state.syncLoading||!state.client||!state.syncDialogOpen)return;
    state.syncLoading=true;
-   state.syncCandidates=[];
+   state.syncAllCandidates=[];state.syncCandidates=[];
    state.syncTotal=0;state.syncProcessed=0;state.syncImported=0;state.syncSkipped=0;
    state.syncMessage="Garmin Connectの更新を確認中…";
    render();
@@ -385,15 +410,15 @@
      if(!Number.isInteger(pending)||pending<0||pending!==items.length||
        !items.every(item=>/^\d{6,20}$/.test(String(item.garminId||""))))
        throw new Error("確認結果の形式が不正だよ。");
-     state.syncCandidates=items.map(item=>({
+     state.syncAllCandidates=items.map(item=>({
        garminId:String(item.garminId),title:String(item.title||""),startedAt:item.startedAt||null
      }));
-     state.syncMessage=pending===0?"新しいランはないよ。すべて取り込み済みだね！":
-       "未取り込みのランが"+pending+"件見つかったよ。";
+     chooseSyncCandidates();
+     state.syncMessage=syncScopeSummary();
      if(Number(data.unfinished)>0)state.syncMessage+=" 中断された前回の記録も含まれるよ。";
    }catch(e){
      console.warn("Garmin preview failed:",e);
-     state.syncCandidates=[];
+     state.syncAllCandidates=[];state.syncCandidates=[];
      state.syncMessage="更新を確認できなかったよ（"+(e?.message||"通信エラー")+"）。時間をおいて再確認してね。";
    }finally{
      state.syncLoading=false;
@@ -403,7 +428,9 @@
  async function syncAllGarmin(){
    if(state.role!=="admin"||state.syncLoading||!state.client||!state.syncDialogOpen||
       !state.syncCandidates.length)return;
-   const batch=state.syncCandidates.slice();
+   const batch=state.syncCandidates.slice(0,10);
+   if(state.syncScopeDays===365 &&
+      !window.confirm("過去365日から未取り込みのランを"+batch.length+"件取り込むよ。歴史的な記録も含まれるけれど実行していい？"))return;
    state.syncLoading=true;state.syncRunning=true;state.syncStopRequested=false;
    state.syncTotal=batch.length;state.syncProcessed=0;state.syncImported=0;state.syncSkipped=0;
    let failed=null;
@@ -433,7 +460,7 @@
      }
    }finally{
      state.syncRunning=false;
-     state.syncCandidates=[];
+     state.syncCandidates=[];state.syncAllCandidates=[];
      const imported=state.syncImported, skipped=state.syncSkipped,processed=state.syncProcessed,total=state.syncTotal;
      if(failed){
        console.warn("Garmin sync stopped:",failed);
@@ -444,7 +471,8 @@
          "件は未処理。『もう一度確認』から再開できるよ。";
      }else{
        state.syncMessage="取り込み完了！ "+imported+"件を保存"+
-         (skipped?"、登録済み"+skipped+"件をスキップ":"")+"したよ。";
+         (skipped?"、登録済み"+skipped+"件をスキップ":"")+"したよ。"+
+         (total===10?" 残りがあれば『もう一度確認』で続けられるよ。":"");
      }
      try{if(processed>0)await load();}catch(e){console.warn("Reload after sync failed:",e);}
      state.syncLoading=false;
@@ -884,6 +912,15 @@
          out.textContent=state.axis==="lap"?(p.label+"・"+(segments[p.lap.segment_type]||"未分類")+"・"+fmtDist(p.lap.distance_m)+"・"+fmtTime(p.lap.duration_seconds)+"・ペース "+fmtPaceSec(p.pace)+"・平均心拍 "+(finite(p.hr)?Math.round(p.hr)+" bpm":"—")+"・最大心拍 "+(finite(p.lap.max_heart_rate_bpm)?Math.round(n(p.lap.max_heart_rate_bpm))+" bpm":"—")):(p.label+"・ペース "+fmtPaceSec(p.pace)+"・心拍 "+(finite(p.hr)?Math.round(p.hr)+" bpm":"—"));
          out.hidden=false;
        }
+     });
+     root().addEventListener("change",e=>{
+       if(e.target?.dataset?.runSyncScope===undefined||state.syncLoading)return;
+       const days=Number(e.target.value);
+       if(![14,30,365].includes(days))return;
+       state.syncScopeDays=days;
+       chooseSyncCandidates();
+       state.syncMessage=syncScopeSummary();
+       render();
      });
      root().addEventListener("keydown",e=>{
        if(!state.syncDialogOpen)return;
