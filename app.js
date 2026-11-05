@@ -34,7 +34,9 @@
   // to Oct 21-23, 2026: Wed cardboard / Thu newspapers / Fri non-burnables.
   // Special dates can override the entire day's pickup: [] means no collection.
   // e.g. "YYYY-MM-DD": [], "YYYY-MM-DD": ["臨時収集品目"].
-  const garbageExceptions={};
+  const garbageExceptions={
+    "2026-12-31":[], "2027-01-01":[], "2027-01-02":[], "2027-01-03":[]
+  };
   function garbageForDay(day){
     if(Object.prototype.hasOwnProperty.call(garbageExceptions,day))
       return [...garbageExceptions[day]];
@@ -50,6 +52,11 @@
       case 5:return ["ペットボトル",alternate?"燃やせないごみ":"缶"];
       default:return [];
     }
+  }
+  function garbageDisplayForDay(day){
+    const planned=garbageForDay(day);
+    return planned.length?planned:
+      Object.prototype.hasOwnProperty.call(garbageExceptions,day)?["年末年始は収集なし"]:[];
   }
   const fmtDay=day=>Number(day.slice(5,7))+"/"+Number(day.slice(8))+"("+["日","月","火","水","木","金","土"][weekday(day)]+")";
   // Japan Cabinet Office holidays for 2026-2027, including substitute and bridge holidays.
@@ -521,7 +528,7 @@
   }
   function agendaDetails(day,row,compact=false){
     const lines=filledAgendaFields(row).map(k=>line(person[k],row[k],row[agendaUrlField(k)])).join("");
-    const garbage=garbageForDay(day);
+    const garbage=garbageDisplayForDay(day);
     const garbageLine=garbage.length?line("ゴミ",garbage.join("、")):"";
     return '<div class="dayrow'+(compact?' dayrow-inline':'')+'">'+
       (compact?"":'<button type="button" data-action="edit-day" data-day="'+day+'" class="daydate '+weekend(day)+'">'+fmtDay(day)+(holidayName(day)?' <span class="holiday-name">'+esc(holidayName(day))+'</span>':"")+'</button>')+
@@ -592,7 +599,7 @@
     $("weather-summary").innerHTML='<div class="weather-summary"><strong>朝</strong> '+weatherPart(now.morning_weather,now.morning_temp_c,now.morning_rain_pct)+' <span class="muted">／</span> <strong>夕</strong> '+weatherPart(now.evening_weather,now.evening_temp_c,now.evening_rain_pct)+'</div>';
     renderDailyAgenda("today-schedule",now);
     showOptional("today-lunch",now.lunch);
-    setScheduleTodo("today-garbage",garbageForDay(today));
+    setScheduleTodo("today-garbage",garbageDisplayForDay(today));
     setScheduleTodo("today-cleaning",dueCleaningToday(today));
     setScheduleTodo("today-task",dueTasksToday(today));
     setScheduleTodo("today-shopping",shoppingToday());
@@ -603,7 +610,7 @@
       ' <span class="muted">／</span> <span class="tomorrow-forecast"><strong>夕</strong> '+weatherPart(next.evening_weather,next.evening_temp_c,next.evening_rain_pct)+'</span>';
     renderDailyAgenda("tomorrow-schedule",next);
     showOptional("tomorrow-lunch",next.lunch);
-    showOptional("tomorrow-garbage",garbageForDay(tomorrow).join("\n"));
+    showOptional("tomorrow-garbage",garbageDisplayForDay(tomorrow).join("\n"));
 
     // Always show all seven days from the day after tomorrow, including days without plans.
     const upcoming=Array.from({length:7},(_,i)=>dateAdd(today,i+2));
@@ -1057,7 +1064,7 @@
     const entries=arr.map(day=>{
       const changed=state.draft.has(day),opened=state.opened.has(day);
       const preview=f.map(k=>monthValue(day,k)).filter(Boolean).map(x=>String(x).replace(/\s+/g," ").slice(0,20)).join(" / ");
-      const garbage=state.mode==="schedule"?garbageForDay(day):[];
+      const garbage=state.mode==="schedule"?garbageDisplayForDay(day):[];
       const briefGarbage=garbage.length?"🗑 "+garbage[0]+(garbage.length>1?" ほか"+(garbage.length-1)+"種":""):"";
       const garbageDetails=garbage.length?'<div class="month-garbage-info"><strong>🗑 ゴミ出し</strong>'+
         '<div class="month-garbage-lines">'+garbage.map(x=>'<span>'+esc(x)+'</span>').join("")+'</div></div>':"";
