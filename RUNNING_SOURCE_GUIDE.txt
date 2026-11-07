@@ -1,0 +1,43 @@
+ランニング機能 ソース案内
+更新日: 2026-11-07
+
+GitHub リポジトリ:
+https://github.com/hideboshi06/family-database-v2
+既定ブランチ: main
+
+主要なソース (すべてリポジトリ直下):
+- running.js
+  大会登録・編集、目標タイムの入力・検証・保存、ランニング履歴、
+  シューズ管理、Garmin連携データ表示、Supabase連携。
+  大会登録フォーム: raceForm()
+  時刻の検証・秒への変換: parseRaceTime()
+  大会情報の保存: saveCatalog()
+  https://github.com/hideboshi06/family-database-v2/blob/main/running.js
+- running.css
+  ランニング画面の見た目・スマートフォン向けスタイル。
+  https://github.com/hideboshi06/family-database-v2/blob/main/running.css
+- index.html
+  ランニング画面 (#page-running, #running-root) と running.js / running.css の読み込み。
+  https://github.com/hideboshi06/family-database-v2/blob/main/index.html
+- app.js
+  ランニング画面へのタブ移動、認証後の FamilyRunning.init() 呼び出し。
+  https://github.com/hideboshi06/family-database-v2/blob/main/app.js
+- sw.js
+  サービスワーカー。プッシュ通知の動作など。
+  https://github.com/hideboshi06/family-database-v2/blob/main/sw.js
+
+関連データ:
+- Supabase テーブル running_races: 大会情報・目標タイム (target_time_seconds)
+- running_activities: ランニング記録
+- running_shoes: シューズ情報
+- running_laps: ラップ情報
+
+2026-11-07 目標タイム入力欄の修正:
+- running.js の raceForm() にある target_time は type="text"。
+- 以前の inputmode="numeric" によりスマホで「:」を打ちにくかったため、
+  inputmode="text" に変更。
+- 保存時の parseRaceTime() は「時:分:秒」形式を確認し、秒数に変換する。
+- index.html の running.js 読み込みバージョンも更新。
+- 入力例: 2:45:00 / 1:15:22
+
+注: このガイドはソース場所の案内用。個人のレース記録は記載していない。
