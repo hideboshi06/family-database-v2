@@ -234,7 +234,7 @@
         ["considering","検討中"],["registered","エントリー済み"],["completed","出走済み"],["cancelled","中止・見送り"]
       ],r.registration_status||"considering")+
       '<details class="run-entry-details"><summary>任意の詳細（目標タイム・優先度など）</summary><div class="run-entry-details-grid">'+
-       formInput("target_time","目標タイム（時:分:秒）","text",r.target_time_seconds?fmtTime(r.target_time_seconds):"",'placeholder="例：2:00:00" inputmode="numeric"')+
+       formInput("target_time","目標タイム（時:分:秒）","text",r.target_time_seconds?fmtTime(r.target_time_seconds):"",'placeholder="例：2:00:00" inputmode="text" autocomplete="off" spellcheck="false"')+
        formSelect("priority","優先度",[["","未設定"],["A","A（本命）"],["B","B"],["C","C"]],r.priority||"")+
        formInput("location","開催場所","text",r.location||"",'maxlength="200"')+
        formInput("official_url","大会のURL","url",r.official_url||"",'placeholder="https://"')+
